@@ -1,6 +1,7 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session
 
 app = Flask(__name__)
+app.secret_key = 'your-secret-key-here'  # Required for session management
 
 @app.route('/')
 def index():
@@ -29,6 +30,60 @@ def process_input():
     else:
         response = {"status": "error", "message": "Please enter only alphabetic characters"}
     return jsonify(response)
+
+@app.route('/api/game-state', methods=['GET'])
+def game_state():
+    """API endpoint to manage game state and button rendering"""
+    game_active = session.get('game_active', False)
+    
+    if game_active:
+        button_html = """
+            <button class="game-button reset" 
+                    hx-post="/api/toggle-game"
+                    hx-target="#game-buttons"
+                    hx-swap="innerHTML">
+                Reset
+            </button>
+        """
+    else:
+        # When game is inactive, update both the button and display area
+        button_html = f"""
+            <button class="game-button" 
+                    hx-post="/api/toggle-game"
+                    hx-target="#game-buttons"
+                    hx-swap="innerHTML">
+                Start Game
+            </button>
+            <script>
+                document.getElementById('display-area').innerHTML = 
+                    '<div class="default-message">Play the Thesaurus Game</div>';
+            </script>
+        """
+    return button_html
+
+@app.route('/api/toggle-game', methods=['POST'])
+def toggle_game():
+    """API endpoint to toggle game state"""
+    was_active = session.get('game_active', False)
+    session['game_active'] = not was_active
+    
+    if was_active:
+        # Clear the display area when resetting
+        return game_state() + """
+            <script>
+                document.getElementById('display-area').innerHTML = 
+                    '<div class="default-message">Play the Thesaurus Game</div>';
+            </script>
+        """
+    else:
+        # Clear the display area when starting
+        return game_state() + """
+            <script>
+                document.getElementById('display-area').innerHTML = '';
+                document.getElementById('input-result').innerHTML = '';
+            </script>
+        """
+    return game_state()
 
 if __name__ == '__main__':
     app.run(debug=True) 

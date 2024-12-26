@@ -2,26 +2,19 @@
 
 {% block content %}
 <div class="container">
-    <h1>Text Display and Input API Demo</h1>
+    <h1>PAGE HEADER</h1>
     
     <!-- Display Area -->
     <div class="display-section">
-        <h2>Display Area</h2>
+        <h2>The words that share a common synonym are:</h2>
         <div id="display-area" class="text-area">
             <!-- Dynamic content will be loaded here -->
         </div>
-        
-        <!-- Test button to demonstrate dynamic text display -->
-        <button hx-post="/api/display-text"
-                hx-target="#display-area"
-                hx-vals='{"display_text": "Sample dynamic text"}'>
-            Update Display
-        </button>
     </div>
 
     <!-- Input Area -->
     <div class="input-section">
-        <h2>Input Area</h2>
+        <h2>Guess the common parent synonym</h2>
         <form hx-post="/api/process-input" 
               hx-target="#input-result">
             <input type="text" 
@@ -36,6 +29,13 @@
             <!-- Input processing results will appear here -->
         </div>
     </div>
+
+    <!-- Game Control Section -->
+    <div class="game-control-section">
+        <div id="game-buttons" hx-get="/api/game-state" hx-trigger="load">
+            <!-- Buttons will be dynamically loaded here -->
+        </div>
+    </div>
 </div>
 
 <style>
@@ -44,7 +44,7 @@
         margin: 0 auto;
         padding: 20px;
     }
-    .display-section, .input-section {
+    .display-section, .input-section, .game-control-section {
         margin: 20px 0;
         padding: 20px;
         border: 1px solid #ccc;
@@ -59,6 +59,25 @@
     input[type="text"] {
         padding: 5px;
         margin-right: 10px;
+    }
+    .game-button {
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+    }
+    .game-button.reset {
+        background-color: #f44336;
+    }
+    .default-message {
+        font-size: 24px;
+        color: #666;
+        text-align: center;
+        padding: 20px;
+        font-style: italic;
     }
 </style>
 {% endblock %} 

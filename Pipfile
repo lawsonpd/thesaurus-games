@@ -4,7 +4,8 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-flask = "*"
+flask = "==3.0.2"
+itsdangerous = "==2.1.2"
 
 [dev-packages]
 
