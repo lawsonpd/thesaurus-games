@@ -2,38 +2,48 @@
 
 {% block content %}
 <div class="container">
-    <h1>PAGE HEADER</h1>
+    <h1>Thesaurus Game</h1>
     
-    <!-- Display Area -->
-    <div class="display-section">
-        <h2>The words that share a common synonym are:</h2>
-        <div id="display-area" class="text-area">
-            <!-- Dynamic content will be loaded here -->
+    <!-- Game Area Wrapper -->
+    <div id="game-area">
+        <!-- Display Area -->
+        <div class="display-section">
+            <h2>The words that share a common synonym are:</h2>
+            <div id="display-area" class="text-area">
+                <div class="default-message">Play the Thesaurus Game</div>
+            </div>
         </div>
-    </div>
 
-    <!-- Input Area -->
-    <div class="input-section">
-        <h2>Guess the common parent synonym</h2>
-        <form hx-post="/api/process-input" 
-              hx-target="#input-result">
-            <input type="text" 
-                   name="text" 
-                   placeholder="Enter text here..."
-                   pattern="[A-Za-z]+"
-                   title="Please enter only alphabetic characters"
-                   required>
-            <button type="submit">Submit</button>
-        </form>
-        <div id="input-result">
-            <!-- Input processing results will appear here -->
+        <!-- Game Status -->
+        <div id="game-status">
+            <!-- Game status messages will appear here -->
         </div>
-    </div>
 
-    <!-- Game Control Section -->
-    <div class="game-control-section">
-        <div id="game-buttons" hx-get="/api/game-state" hx-trigger="load">
-            <!-- Buttons will be dynamically loaded here -->
+        <!-- Input Area -->
+        <div class="input-section">
+            <h2>Guess the common parent word</h2>
+            <form hx-post="/api/process-input" 
+                  hx-target="#input-result">
+                <input type="text" 
+                       name="text" 
+                       placeholder="Enter text here..."
+                       pattern="[A-Za-z]+"
+                       title="Please enter only alphabetic characters"
+                       required>
+                <button type="submit">Submit</button>
+            </form>
+            <div id="input-result">
+                <!-- Input processing results will appear here -->
+            </div>
+        </div>
+
+        <!-- Game Control Section -->
+        <div class="game-control-section">
+            <div id="game-buttons" 
+                 hx-get="/api/game-state" 
+                 hx-trigger="load">
+                <!-- Buttons will be dynamically loaded here -->
+            </div>
         </div>
     </div>
 </div>
@@ -78,6 +88,19 @@
         text-align: center;
         padding: 20px;
         font-style: italic;
+    }
+    .synonym {
+        margin: 5px 0;
+        padding: 5px;
+        background-color: #f0f0f0;
+        border-radius: 3px;
+    }
+    
+    #game-status {
+        margin: 10px 0;
+        padding: 10px;
+        text-align: center;
+        font-weight: bold;
     }
 </style>
 {% endblock %} 
