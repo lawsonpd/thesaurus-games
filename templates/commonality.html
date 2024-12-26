@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h1>Text Display and Input API Demo</h1>
+    
+    <!-- Display Area -->
+    <div class="display-section">
+        <h2>Display Area</h2>
+        <div id="display-area" class="text-area">
+            <!-- Dynamic content will be loaded here -->
+        </div>
+        
+        <!-- Test button to demonstrate dynamic text display -->
+        <button hx-post="/api/display-text"
+                hx-target="#display-area"
+                hx-vals='{"display_text": "Sample dynamic text"}'>
+            Update Display
+        </button>
+    </div>
+
+    <!-- Input Area -->
+    <div class="input-section">
+        <h2>Input Area</h2>
+        <form hx-post="/api/process-input" 
+              hx-target="#input-result">
+            <input type="text" 
+                   name="text" 
+                   placeholder="Enter text here..."
+                   pattern="[A-Za-z]+"
+                   title="Please enter only alphabetic characters"
+                   required>
+            <button type="submit">Submit</button>
+        </form>
+        <div id="input-result">
+            <!-- Input processing results will appear here -->
+        </div>
+    </div>
+</div>
+
+<style>
+    .container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    .display-section, .input-section {
+        margin: 20px 0;
+        padding: 20px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+    }
+    .text-area {
+        min-height: 100px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        margin: 10px 0;
+    }
+    input[type="text"] {
+        padding: 5px;
+        margin-right: 10px;
+    }
+</style>
+{% endblock %} 
