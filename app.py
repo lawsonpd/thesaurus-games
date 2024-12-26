@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session, Response
+from flask import Flask, render_template, request, jsonify, session, Response, render_template_string
 import requests
 import random
 import os
@@ -116,22 +116,40 @@ def process_input():
     target_word = session.get('target_word', '').lower()
     
     if not input_text.isalpha():
-        return jsonify({
-            "status": "error",
-            "message": "Please enter only alphabetic characters"
-        })
+        return render_template_string("""
+            <div class="error-message">Please enter only alphabetic characters</div>
+            <div class="guesses">
+                {% for guess in guesses %}
+                    <span class="guess">{{ guess }}</span>
+                {% endfor %}
+            </div>
+        """, guesses=session.get('guesses', []))
+    
+    # Store the guess in session
+    guesses = session.get('guesses', [])
+    guesses.append(input_text)
+    session['guesses'] = guesses
+    session.modified = True
     
     if input_text == target_word:
         session['game_active'] = False
-        return jsonify({
-            "status": "win",
-            "message": f"Congratulations! The word was '{target_word}'"
-        })
+        return render_template_string("""
+            <div class="success-message">Congratulations! The word was '{{ target_word }}'</div>
+            <div class="guesses">
+                {% for guess in guesses %}
+                    <span class="guess">{{ guess }}</span>
+                {% endfor %}
+            </div>
+        """, target_word=target_word, guesses=guesses)
     
-    return jsonify({
-        "status": "wrong",
-        "message": "Try again!"
-    })
+    return render_template_string("""
+        <div class="error-message">Try again!</div>
+        <div class="guesses">
+            {% for guess in guesses %}
+                <span class="guess">{{ guess }}</span>
+            {% endfor %}
+        </div>
+    """, guesses=guesses)
 
 @app.route('/api/game-state', methods=['GET'])
 def game_state():
@@ -312,11 +330,12 @@ def next_synonym():
     if len(displayed) >= 10 or len(displayed) >= len(all_synonyms):
         session['game_active'] = False
         session.modified = True
-        # Send HX-Trigger to update game state
+        print(f'Game active: {session['game_active']}')
         return Response(
-            "Game Over! Too many synonyms displayed.",
+            "",  # Empty content
             headers={
-                "HX-Trigger": "gameStateChange"
+                "HX-Trigger": "gameStateChange",
+                "HX-Reswap": "innerHTML"
             }
         )
     
