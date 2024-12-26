@@ -15,7 +15,7 @@ WORDS_API_KEY = os.getenv('RAPIDAPI_KEY')
 print(f"API Key loaded: {'*' * len(WORDS_API_KEY) if WORDS_API_KEY else 'None'}")  # Debug log - masks the key
 
 def get_random_word():
-    """Get a random word from the API"""
+    """Get a random word from the API with frequency filter"""
     url = f"https://{WORDS_API_HOST}/words/"
     headers = {
         "x-rapidapi-key": WORDS_API_KEY,
@@ -23,14 +23,22 @@ def get_random_word():
     }
     
     try:
-        print(f"Requesting random word with headers: {headers}")  # Debug log
-        response = requests.get(url + "?random=true", headers=headers)
+        # Add frequency parameter to get more common words
+        params = {
+            "random": "true",
+            "hasDetails": "frequency",
+            "frequencyMin": "3.0"  # Adjust this value as needed (1-7 scale)
+        }
+        print(f"Requesting random word with params: {params}")  # Debug log
+        response = requests.get(url, headers=headers, params=params)
         print(f"Random word response status: {response.status_code}")  # Debug log
         print(f"Random word response: {response.text}")  # Debug log
         
         if response.status_code == 200:
-            word = response.json().get('word')
-            print(f"Got word: {word}")  # Debug log
+            data = response.json()
+            word = data.get('word')
+            frequency = data.get('frequency', 0)
+            print(f"Got word: {word} with frequency: {frequency}")  # Debug log
             return word
         else:
             print(f"Error getting random word: {response.text}")  # Debug log
@@ -64,16 +72,19 @@ def get_synonyms(word):
         print(f"Exception getting synonyms: {str(e)}")  # Debug log
         return []
 
-def get_random_word_with_synonyms(max_attempts=5):
-    """Get a random word that has synonyms"""
+def get_random_word_with_synonyms(max_attempts=5, min_synonyms=5):
+    """Get a random word that has enough synonyms"""
     for _ in range(max_attempts):
         word = get_random_word()
         if not word:
             continue
             
         synonyms = get_synonyms(word)
-        if synonyms:  # Only return if we found synonyms
+        if len(synonyms) >= min_synonyms:  # Only return if we have enough synonyms
+            print(f"Found suitable word '{word}' with {len(synonyms)} synonyms")  # Debug log
             return word, synonyms
+        else:
+            print(f"Skipping word '{word}' with only {len(synonyms)} synonyms")  # Debug log
             
     return None, None
 
