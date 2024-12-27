@@ -107,6 +107,8 @@ def process_input():
     input_text = request.form.get('text', '').lower()
     target_word = session.get('target_word', '').lower()
     displayed = session.get('displayed_synonyms', [])
+    all_synonyms = session.get('synonyms', [])
+    remaining = [s for s in all_synonyms if s not in displayed]
     
     if not input_text.isalpha():
         return Response(
@@ -127,6 +129,32 @@ def process_input():
     guesses = session.get('guesses', [])
     guesses.append(input_text)
     session['guesses'] = guesses
+    
+    # Check if guess is a remaining synonym
+    if input_text in remaining:
+        # Move the synonym to displayed list
+        remaining.remove(input_text)
+        displayed.append(input_text)
+        session['displayed_synonyms'] = displayed
+        session['close_guess'] = input_text  # Mark this synonym for highlighting
+        session.modified = True
+        
+        return Response(
+            render_template_string("""
+                <div id="input-result">
+                    <div class="close-guess-message">Close guess!</div>
+                    <div class="guesses">
+                        {% for guess in guesses %}
+                            <span class="guess">{{ guess }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            """, guesses=guesses),
+            headers={
+                "HX-Trigger": ["clearInput", "refreshSynonyms"]
+            }
+        )
+    
     session.modified = True
     
     if input_text == target_word:
@@ -376,32 +404,30 @@ def next_synonym():
     
     all_synonyms = session.get('synonyms', [])
     displayed = session.get('displayed_synonyms', [])
+    close_guess = session.get('close_guess', None)
     target_word = session.get('target_word', '')
     remaining_count = len(all_synonyms) - len(displayed)
     
-    if len(displayed) >= 10 or len(displayed) >= len(all_synonyms):
+    # Check for game over condition first
+    if len(displayed) >= len(all_synonyms):
         session['game_active'] = False
         session.modified = True
-        
-        # Return game over state with all content
         return Response(
             render_template_string("""
-                <div id="display-area">
-                    <div class="game-over-message">
-                        Game Over! The word was '{{ target_word }}'
+                <div class="game-over-message">
+                    Game Over! The word was '{{ target_word }}'
+                </div>
+                <div>The synonyms were:</div>
+                <div class="synonyms-container">
+                    <div class="synonyms-column">
+                        {% for word in displayed[::2] %}
+                            <span class="synonym-word">{{ word }}</span>
+                        {% endfor %}
                     </div>
-                    <div>The synonyms were:</div>
-                    <div class="synonyms-container">
-                        <div class="synonyms-column">
-                            {% for word in displayed[::2] %}
-                                <span class="synonym-word">{{ word }}</span>
-                            {% endfor %}
-                        </div>
-                        <div class="synonyms-column">
-                            {% for word in displayed[1::2] %}
-                                <span class="synonym-word">{{ word }}</span>
-                            {% endfor %}
-                        </div>
+                    <div class="synonyms-column">
+                        {% for word in displayed[1::2] %}
+                            <span class="synonym-word">{{ word }}</span>
+                        {% endfor %}
                     </div>
                 </div>
                 <div id="game-buttons">
@@ -413,7 +439,7 @@ def next_synonym():
                     </button>
                 </div>
             """, 
-            displayed=displayed, 
+            displayed=displayed,
             target_word=target_word),
             headers={
                 "HX-Reswap": "innerHTML",
@@ -421,29 +447,56 @@ def next_synonym():
             }
         )
     
-    # Get next synonym
-    remaining = [s for s in all_synonyms if s not in displayed]
-    next_syn = random.choice(remaining)
-    displayed.append(next_syn)
-    session['displayed_synonyms'] = displayed
-    session.modified = True
+    # Get next synonym if not showing a close guess
+    if not close_guess:
+        remaining = [s for s in all_synonyms if s not in displayed]
+        next_syn = random.choice(remaining)
+        displayed.append(next_syn)
+        session['displayed_synonyms'] = displayed
+        session.modified = True
+    else:
+        # Clear the close guess flag after showing it once
+        session['close_guess'] = None
+        session.modified = True
     
     # Create two-column layout with synonyms
-    return render_template_string("""
-        <div class="synonym-counter">Remaining clues: {{ remaining }}</div>
-        <div class="synonyms-container">
-            <div class="synonyms-column">
-                {% for word in displayed[::2] %}
-                    <span class="synonym-word">{{ word }}</span>
-                {% endfor %}
+    return Response(
+        render_template_string("""
+            <div class="synonym-counter">Remaining clues: {{ remaining }}</div>
+            <div class="synonyms-container">
+                <div class="synonyms-column">
+                    {% for word in displayed[::2] %}
+                        <span class="synonym-word {% if word == close_guess %}close-guess{% endif %}">
+                            {{ word }}
+                        </span>
+                    {% endfor %}
+                </div>
+                <div class="synonyms-column">
+                    {% for word in displayed[1::2] %}
+                        <span class="synonym-word {% if word == close_guess %}close-guess{% endif %}">
+                            {{ word }}
+                        </span>
+                    {% endfor %}
+                </div>
             </div>
-            <div class="synonyms-column">
-                {% for word in displayed[1::2] %}
-                    <span class="synonym-word">{{ word }}</span>
-                {% endfor %}
-            </div>
-        </div>
-    """, displayed=displayed, remaining=remaining_count - 1)  # -1 because we just added one
+            <script>
+                document.getElementById('input-result').innerHTML = `
+                    <div class="guesses">
+                        {% for guess in session.get('guesses', []) %}
+                            <span class="guess">{{ guess }}</span>
+                        {% endfor %}
+                    </div>
+                `;
+            </script>
+        """, 
+        displayed=displayed, 
+        remaining=remaining_count - (0 if close_guess else 1),
+        close_guess=close_guess),
+        headers={
+            "HX-Reswap": "innerHTML",
+            "HX-Retarget": "#display-area"
+        }
+    )
 
 if __name__ == '__main__':
     app.run(debug=True) 
