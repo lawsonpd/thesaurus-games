@@ -109,14 +109,19 @@ def process_input():
     displayed = session.get('displayed_synonyms', [])
     
     if not input_text.isalpha():
-        return render_template_string("""
-            <div class="error-message">Please enter only alphabetic characters</div>
-            <div class="guesses">
-                {% for guess in guesses %}
-                    <span class="guess">{{ guess }}</span>
-                {% endfor %}
-            </div>
-        """, guesses=session.get('guesses', []))
+        return Response(
+            render_template_string("""
+                <div class="error-message">Please enter only alphabetic characters</div>
+                <div class="guesses">
+                    {% for guess in guesses %}
+                        <span class="guess">{{ guess }}</span>
+                    {% endfor %}
+                </div>
+            """, guesses=session.get('guesses', [])),
+            headers={
+                "HX-Trigger": "clearInput"
+            }
+        )
     
     # Store the guess in session
     guesses = session.get('guesses', [])
@@ -173,18 +178,24 @@ def process_input():
             displayed=displayed),
             headers={
                 "HX-Retarget": "#game-area",
-                "HX-Reswap": "innerHTML"
+                "HX-Reswap": "innerHTML",
+                "HX-Trigger": "clearInput"
             }
         )
     
-    return render_template_string("""
-        <div class="error-message">Try again!</div>
-        <div class="guesses">
-            {% for guess in guesses %}
-                <span class="guess">{{ guess }}</span>
-            {% endfor %}
-        </div>
-    """, guesses=guesses)
+    return Response(
+        render_template_string("""
+            <div class="error-message">Try again!</div>
+            <div class="guesses">
+                {% for guess in guesses %}
+                    <span class="guess">{{ guess }}</span>
+                {% endfor %}
+            </div>
+        """, guesses=guesses),
+        headers={
+            "HX-Trigger": "clearInput"
+        }
+    )
 
 @app.route('/api/game-state', methods=['GET'])
 def game_state():
@@ -324,7 +335,8 @@ def start_game():
         <div class="input-section">
             <h2>Guess the common parent word</h2>
             <form hx-post="/api/process-input" 
-                  hx-target="#input-result">
+                  hx-target="#input-result"
+                  hx-on::after-request="this.reset()">
                 <input type="text" 
                        name="text" 
                        placeholder="Enter text here..."

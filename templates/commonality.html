@@ -189,4 +189,10 @@
         font-weight: bold;
     }
 </style>
+
+<script>
+    document.body.addEventListener('clearInput', function(evt) {
+        document.querySelector('input[name="text"]').value = '';
+    });
+</script>
 {% endblock %} 
