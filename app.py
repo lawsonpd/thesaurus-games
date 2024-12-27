@@ -23,70 +23,62 @@ def get_random_word():
     }
     
     try:
-        # Add frequency parameter to get more common words
         params = {
             "random": "true",
-            "hasDetails": "frequency",
-            "frequencyMin": "3.0"  # Adjust this value as needed (1-7 scale)
+            "hasDetails": "frequency,partOfSpeech",
+            "frequencyMin": "3.0"
         }
-        print(f"Requesting random word with params: {params}")  # Debug log
+        print(f"Requesting random word with params: {params}")
         response = requests.get(url, headers=headers, params=params)
-        print(f"Random word response status: {response.status_code}")  # Debug log
-        print(f"Random word response: {response.text}")  # Debug log
+        print(f"Random word response: {response.text}")
         
         if response.status_code == 200:
             data = response.json()
+            # Get all results that have synonyms
+            results = [r for r in data.get('results', []) 
+                      if r.get('synonyms') and r.get('partOfSpeech')]
+            
+            if not results:
+                return None, None, None
+                
+            # Choose a random result that has synonyms
+            result = random.choice(results)
             word = data.get('word')
-            frequency = data.get('frequency', 0)
-            print(f"Got word: {word} with frequency: {frequency}")  # Debug log
-            return word
+            part_of_speech = result.get('partOfSpeech')
+            synonyms = result.get('synonyms', [])
+            
+            print(f"Got word: {word} ({part_of_speech}) with synonyms: {synonyms}")
+            return word, part_of_speech, synonyms
         else:
-            print(f"Error getting random word: {response.text}")  # Debug log
-            return None
+            print(f"Error getting random word: {response.text}")
+            return None, None, None
     except Exception as e:
-        print(f"Exception getting random word: {str(e)}")  # Debug log
-        return None
+        print(f"Exception getting random word: {str(e)}")
+        return None, None, None
 
-def get_synonyms(word):
-    """Get synonyms for a given word"""
-    url = f"https://{WORDS_API_HOST}/words/{word}/synonyms"
-    headers = {
-        "x-rapidapi-key": WORDS_API_KEY,
-        "x-rapidapi-host": WORDS_API_HOST
-    }
-    
-    try:
-        print(f"Requesting synonyms for word: {word}")  # Debug log
-        response = requests.get(url, headers=headers)
-        print(f"Synonyms response status: {response.status_code}")  # Debug log
-        print(f"Synonyms response: {response.text}")  # Debug log
-        
-        if response.status_code == 200:
-            synonyms = response.json().get('synonyms', [])
-            print(f"Got synonyms: {synonyms}")  # Debug log
-            return synonyms
-        else:
-            print(f"Error getting synonyms: {response.text}")  # Debug log
-            return []
-    except Exception as e:
-        print(f"Exception getting synonyms: {str(e)}")  # Debug log
-        return []
-
-def get_random_word_with_synonyms(max_attempts=5, min_synonyms=5):
+def get_random_word_with_synonyms(min_synonyms=5):
     """Get a random word that has enough synonyms"""
-    for _ in range(max_attempts):
-        word = get_random_word()
-        if not word:
-            continue
-            
-        synonyms = get_synonyms(word)
-        if len(synonyms) >= min_synonyms:  # Only return if we have enough synonyms
-            print(f"Found suitable word '{word}' with {len(synonyms)} synonyms")  # Debug log
-            return word, synonyms
-        else:
-            print(f"Skipping word '{word}' with only {len(synonyms)} synonyms")  # Debug log
-            
-    return None, None
+    max_attempts_per_word = 5
+    max_total_attempts = 20
+    total_attempts = 0
+    
+    while total_attempts < max_total_attempts:
+        for _ in range(max_attempts_per_word):
+            total_attempts += 1
+            word, part_of_speech, synonyms = get_random_word()
+            if not word or not synonyms:
+                continue
+                
+            if len(synonyms) >= min_synonyms:
+                print(f"Found suitable word '{word}' ({part_of_speech}) with {len(synonyms)} synonyms")
+                return word, synonyms, part_of_speech
+            else:
+                print(f"Skipping word '{word}' ({part_of_speech}) with only {len(synonyms)} synonyms")
+        
+        print(f"No suitable word found in batch, trying again...")
+    
+    print(f"Failed to find suitable word after {total_attempts} attempts")
+    return None, None, None
 
 @app.route('/')
 def index():
@@ -114,6 +106,7 @@ def process_input():
     
     input_text = request.form.get('text', '').lower()
     target_word = session.get('target_word', '').lower()
+    displayed = session.get('displayed_synonyms', [])
     
     if not input_text.isalpha():
         return render_template_string("""
@@ -133,14 +126,56 @@ def process_input():
     
     if input_text == target_word:
         session['game_active'] = False
-        return render_template_string("""
-            <div class="success-message">Congratulations! The word was '{{ target_word }}'</div>
-            <div class="guesses">
-                {% for guess in guesses %}
-                    <span class="guess">{{ guess }}</span>
-                {% endfor %}
+        session.modified = True
+        return Response(
+            render_template_string("""
+            <!-- Display Area -->
+            <div class="display-section">
+                <div class="success-message">Congratulations! The word was '{{ target_word }}'</div>
+                <div class="synonyms-container">
+                    <div class="synonyms-column">
+                        {% for word in displayed[::2] %}
+                            <span class="synonym-word">{{ word }}</span>
+                        {% endfor %}
+                    </div>
+                    <div class="synonyms-column">
+                        {% for word in displayed[1::2] %}
+                            <span class="synonym-word">{{ word }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
-        """, target_word=target_word, guesses=guesses)
+
+            <!-- Input Area -->
+            <div class="input-section">
+                <div class="guesses">
+                    <div class="success-message">Your guesses:</div>
+                    {% for guess in guesses %}
+                        <span class="guess">{{ guess }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Game Control Section -->
+            <div class="game-control-section">
+                <div id="game-buttons">
+                    <button class="game-button" 
+                            hx-post="/api/toggle-game"
+                            hx-target="#game-buttons"
+                            hx-swap="innerHTML">
+                        Start Game
+                    </button>
+                </div>
+            </div>
+            """, 
+            target_word=target_word,
+            guesses=guesses,
+            displayed=displayed),
+            headers={
+                "HX-Retarget": "#game-area",
+                "HX-Reswap": "innerHTML"
+            }
+        )
     
     return render_template_string("""
         <div class="error-message">Try again!</div>
@@ -157,7 +192,7 @@ def game_state():
     game_active = session.get('game_active', False)
     
     if game_active:
-        button_html = """
+        return """
             <button class="game-button reset" 
                     hx-post="/api/toggle-game"
                     hx-target="#game-buttons"
@@ -166,65 +201,52 @@ def game_state():
             </button>
         """
     else:
-        # When game is inactive, update both the button and display area
-        button_html = f"""
+        return """
             <button class="game-button" 
                     hx-post="/api/toggle-game"
                     hx-target="#game-buttons"
                     hx-swap="innerHTML">
                 Start Game
             </button>
-            <script>
-                document.getElementById('display-area').innerHTML = 
-                    '<div class="default-message">Play the Thesaurus Game</div>';
-            </script>
         """
-    return button_html
 
 @app.route('/api/toggle-game', methods=['POST'])
 def toggle_game():
     """API endpoint to toggle game state"""
     was_active = session.get('game_active', False)
-    session['game_active'] = not was_active
     
-    if was_active:
-        # Clear game state when resetting
-        session.pop('target_word', None)
-        session.pop('synonyms', None)
-        session.pop('displayed_synonyms', None)
-        return Response("""
-            <!-- Display Area -->
-            <div class="display-section">
-                <h2>The words that share a common synonym are:</h2>
-                <div id="display-area" class="text-area">
-                    <div class="default-message">Play the Thesaurus Game</div>
+    if not was_active:  # Starting new game
+        return Response(
+            render_template_string("""
+            <div id="game-area">
+                <div class="rules-section">
+                    <h2>Starting game...</h2>
                 </div>
             </div>
-
-            <!-- Game Status -->
-            <div id="game-status"></div>
-
-            <!-- Input Area -->
-            <div class="input-section">
-                <h2>Guess the common parent word</h2>
-                <form hx-post="/api/process-input" 
-                      hx-target="#input-result">
-                    <input type="text" 
-                           name="text" 
-                           placeholder="Enter text here..."
-                           pattern="[A-Za-z]+"
-                           title="Please enter only alphabetic characters"
-                           required>
-                    <button type="submit">Submit</button>
-                </form>
-                <div id="input-result"></div>
+            <script>
+                htmx.ajax('POST', '/api/start-game', {
+                    target: '#game-area',
+                    swap: 'innerHTML'
+                });
+            </script>
+            """)
+        )
+    else:  # Resetting game
+        session.clear()
+        session.modified = True
+        return Response("""
+            <!-- Rules Section -->
+            <div class="rules-section">
+                <h2>How to play:</h2>
+                <p class="rules-text">
+                    The goal is to guess the target word. Synonyms of the target word will be shown one after another. 
+                    Guess the target word before you run out of clues!
+                </p>
             </div>
 
             <!-- Game Control Section -->
             <div class="game-control-section">
-                <div id="game-buttons" 
-                     hx-get="/api/game-state" 
-                     hx-trigger="load">
+                <div id="game-buttons">
                     <button class="game-button" 
                             hx-post="/api/toggle-game"
                             hx-target="#game-buttons"
@@ -239,103 +261,151 @@ def toggle_game():
                 "HX-Reswap": "innerHTML"
             }
         )
-    else:
-        # Start new game
-        return Response("""
-            <!-- Display Area -->
-            <div class="display-section">
-                <h2>The words that share a common synonym are:</h2>
-                <div id="display-area" class="text-area"
-                     hx-trigger="load delay:100ms, every 4s"
-                     hx-post="/api/next-synonym"
-                     hx-swap="innerHTML">
+
+@app.route('/api/start-game', methods=['POST'])
+def start_game():
+    """Initialize a new game"""
+    target_word, synonyms, part_of_speech = get_random_word_with_synonyms()
+    
+    if not target_word or not synonyms:
+        session.clear()
+        session.modified = True
+        return Response(
+            render_template_string("""
+                <div class="error-message">
+                    Failed to start game. Could not find a suitable word. Please try again.
                 </div>
-            </div>
-
-            <!-- Game Status -->
-            <div id="game-status"></div>
-
-            <!-- Input Area -->
-            <div class="input-section">
-                <h2>Guess the common parent word</h2>
-                <form hx-post="/api/process-input" 
-                      hx-target="#input-result">
-                    <input type="text" 
-                           name="text" 
-                           placeholder="Enter text here..."
-                           pattern="[A-Za-z]+"
-                           title="Please enter only alphabetic characters"
-                           required>
-                    <button type="submit">Submit</button>
-                </form>
-                <div id="input-result"></div>
-            </div>
-
-            <!-- Game Control Section -->
-            <div class="game-control-section">
                 <div id="game-buttons">
-                    <button class="game-button reset" 
+                    <button class="game-button" 
                             hx-post="/api/toggle-game"
                             hx-target="#game-buttons"
                             hx-swap="innerHTML">
-                        Reset
+                        Start Game
                     </button>
                 </div>
-            </div>
-            <script>
-                htmx.ajax('POST', '/api/start-game', {target:'#game-status'});
-            </script>
-            """,
+            """),
             headers={
                 "HX-Retarget": "#game-area",
                 "HX-Reswap": "innerHTML"
             }
         )
-
-@app.route('/api/start-game', methods=['POST'])
-def start_game():
-    """Initialize a new game"""
-    target_word, synonyms = get_random_word_with_synonyms()
-    print(f"Got word: {target_word} with synonyms: {synonyms}")  # Debug log
     
-    if not target_word or not synonyms:
-        return jsonify({
-            "error": "Could not find a suitable word with synonyms. Please try again."
-        }), 500
-    
-    # Store game state in session
-    session.clear()  # Clear any existing session data
+    # Set up new game state
     session['target_word'] = target_word
     session['synonyms'] = synonyms
+    session['part_of_speech'] = part_of_speech
     session['displayed_synonyms'] = []
     session['game_active'] = True
-    session.modified = True  # Ensure session is saved
+    session['guesses'] = []
+    session.modified = True
     
-    print(f"Session state after start: {dict(session)}")  # Debug log
-    
-    return jsonify({
-        "status": "success",
-        "message": "Game started"
-    })
+    # Return the initial game UI with the correct part of speech
+    total_synonyms = len(synonyms)
+    return Response(
+        render_template_string("""
+        <!-- Display Area -->
+        <div class="display-section">
+            <h2 class="section-heading">The target word part of speech is {{ part_of_speech }}</h2>
+            <h2 class="section-heading">The synonyms are:</h2>
+            <div id="display-area"
+                 hx-trigger="load delay:100ms, every 4s"
+                 hx-post="/api/next-synonym"
+                 hx-swap="innerHTML">
+                <div class="synonym-counter">Remaining clues: {{ total_synonyms }}</div>
+                <div class="synonyms-container">
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Status -->
+        <div id="game-status"></div>
+
+        <!-- Input Area -->
+        <div class="input-section">
+            <h2>Guess the common parent word</h2>
+            <form hx-post="/api/process-input" 
+                  hx-target="#input-result">
+                <input type="text" 
+                       name="text" 
+                       placeholder="Enter text here..."
+                       pattern="[A-Za-z]+"
+                       title="Please enter only alphabetic characters"
+                       required>
+                <button type="submit">Submit</button>
+            </form>
+            <div id="input-result"></div>
+        </div>
+
+        <!-- Game Control Section -->
+        <div class="game-control-section">
+            <div id="game-buttons">
+                <button class="game-button reset" 
+                        hx-post="/api/toggle-game"
+                        hx-target="#game-buttons"
+                        hx-swap="innerHTML">
+                    Reset
+                </button>
+            </div>
+        </div>
+        """, 
+        part_of_speech=part_of_speech,
+        total_synonyms=total_synonyms),
+        headers={
+            "HX-Retarget": "#game-area",
+            "HX-Reswap": "innerHTML"
+        }
+    )
 
 @app.route('/api/next-synonym', methods=['POST'])
 def next_synonym():
     """Get the next synonym to display"""
     if not session.get('game_active'):
-        return "", 204  # No content response to stop polling
+        return "", 204
     
     all_synonyms = session.get('synonyms', [])
     displayed = session.get('displayed_synonyms', [])
+    target_word = session.get('target_word', '')
+    remaining_count = len(all_synonyms) - len(displayed)
     
     if len(displayed) >= 10 or len(displayed) >= len(all_synonyms):
         session['game_active'] = False
         session.modified = True
-        print(f'Game active: {session['game_active']}')
+        
+        # Return game over state with all content
         return Response(
-            "",  # Empty content
+            render_template_string("""
+                <div id="display-area">
+                    <div class="game-over-message">
+                        Game Over! The word was '{{ target_word }}'
+                    </div>
+                    <div>The synonyms were:</div>
+                    <div class="synonyms-container">
+                        <div class="synonyms-column">
+                            {% for word in displayed[::2] %}
+                                <span class="synonym-word">{{ word }}</span>
+                            {% endfor %}
+                        </div>
+                        <div class="synonyms-column">
+                            {% for word in displayed[1::2] %}
+                                <span class="synonym-word">{{ word }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div id="game-buttons">
+                    <button class="game-button" 
+                            hx-post="/api/toggle-game"
+                            hx-target="#game-buttons"
+                            hx-swap="innerHTML">
+                        Start Game
+                    </button>
+                </div>
+            """, 
+            displayed=displayed, 
+            target_word=target_word),
             headers={
-                "HX-Trigger": "gameStateChange",
-                "HX-Reswap": "innerHTML"
+                "HX-Reswap": "innerHTML",
+                "HX-Retarget": "#game-area"
             }
         )
     
@@ -346,9 +416,22 @@ def next_synonym():
     session['displayed_synonyms'] = displayed
     session.modified = True
     
-    # Return just the text content
-    current_display = "\n".join(displayed)
-    return current_display
+    # Create two-column layout with synonyms
+    return render_template_string("""
+        <div class="synonym-counter">Remaining clues: {{ remaining }}</div>
+        <div class="synonyms-container">
+            <div class="synonyms-column">
+                {% for word in displayed[::2] %}
+                    <span class="synonym-word">{{ word }}</span>
+                {% endfor %}
+            </div>
+            <div class="synonyms-column">
+                {% for word in displayed[1::2] %}
+                    <span class="synonym-word">{{ word }}</span>
+                {% endfor %}
+            </div>
+        </div>
+    """, displayed=displayed, remaining=remaining_count - 1)  # -1 because we just added one
 
 if __name__ == '__main__':
     app.run(debug=True) 
