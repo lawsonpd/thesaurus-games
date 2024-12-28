@@ -80,6 +80,46 @@ def get_random_word_with_synonyms(min_synonyms=5):
     print(f"Failed to find suitable word after {total_attempts} attempts")
     return None, None, None
 
+def get_multiple_words(count=5):
+    """Get multiple words with their synonyms"""
+    words = []
+    max_attempts = count * 4  # Allow multiple attempts per word
+    attempts = 0
+    
+    while len(words) < count and attempts < max_attempts:
+        attempts += 1
+        word, part_of_speech, synonyms = get_random_word()
+        
+        if not word or not synonyms or len(synonyms) < 5:
+            continue
+            
+        # Check if we already have this word
+        if any(w['word'] == word for w in words):
+            continue
+            
+        words.append({
+            'word': word,
+            'part_of_speech': part_of_speech,
+            'synonyms': synonyms
+        })
+        print(f"Added word {len(words)}/{count}: {word}")
+    
+    return words
+
+def ensure_word_cache(session):
+    """Ensure we have enough words in the cache"""
+    if 'word_cache' not in session:
+        print("Initializing word cache with 10 words")
+        session['word_cache'] = get_multiple_words(10)
+        session.modified = True
+    elif len(session['word_cache']) <= 5:
+        print("Replenishing word cache with 5 more words")
+        new_words = get_multiple_words(5)
+        session['word_cache'].extend(new_words)
+        session.modified = True
+    
+    return bool(session['word_cache'])  # Return True if we have words available
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -263,6 +303,12 @@ def toggle_game():
     was_active = session.get('game_active', False)
     
     if not was_active:  # Starting new game
+        # Clear everything except word cache
+        word_cache = session.get('word_cache', [])
+        session.clear()
+        session['word_cache'] = word_cache  # Restore word cache
+        session.modified = True
+        
         return Response(
             render_template_string("""
             <div id="game-area">
@@ -279,9 +325,10 @@ def toggle_game():
             """)
         )
     else:  # Resetting game
-        session.clear()
+        session.clear()  # This will clear everything including word cache
         session.modified = True
-        return Response("""
+        return Response(
+            render_template_string("""
             <!-- Rules Section -->
             <div class="rules-section">
                 <h2>How to play:</h2>
@@ -302,7 +349,7 @@ def toggle_game():
                     </button>
                 </div>
             </div>
-            """,
+            """),
             headers={
                 "HX-Retarget": "#game-area",
                 "HX-Reswap": "innerHTML"
@@ -312,15 +359,14 @@ def toggle_game():
 @app.route('/api/start-game', methods=['POST'])
 def start_game():
     """Initialize a new game"""
-    target_word, synonyms, part_of_speech = get_random_word_with_synonyms()
-    
-    if not target_word or not synonyms:
+    # Ensure we have words available
+    if not ensure_word_cache(session):
         session.clear()
         session.modified = True
         return Response(
             render_template_string("""
                 <div class="error-message">
-                    Failed to start game. Could not find a suitable word. Please try again.
+                    Failed to start game. Could not find suitable words. Please try again.
                 </div>
                 <div id="game-buttons">
                     <button class="game-button" 
@@ -337,6 +383,12 @@ def start_game():
             }
         )
     
+    # Get the next word from the cache
+    word_data = session['word_cache'].pop(0)
+    target_word = word_data['word']
+    synonyms = word_data['synonyms']
+    part_of_speech = word_data['part_of_speech']
+    
     # Set up new game state
     session['target_word'] = target_word
     session['synonyms'] = synonyms
@@ -347,12 +399,12 @@ def start_game():
     
     # Initialize multi-round stats if not exists
     if 'correct_words' not in session:
-        session['correct_words'] = []  # List of successfully guessed words
+        session['correct_words'] = []
         session['current_round'] = 1
     
     session.modified = True
     
-    # Return the initial game UI with the correct part of speech
+    # Return the initial game UI
     total_synonyms = len(synonyms)
     return Response(
         render_template_string("""
@@ -364,9 +416,9 @@ def start_game():
                  hx-trigger="load delay:100ms, every 7s"
                  hx-post="/api/next-synonym"
                  hx-swap="innerHTML">
-                <div class="synonym-counter">Remaining clues: {{ total_synonyms }}</div>
                 <div class="synonyms-container">
                 </div>
+                <div class="synonym-counter">Remaining clues: {{ total_synonyms }}</div>
             </div>
         </div>
 
@@ -489,7 +541,6 @@ def next_synonym():
     # Create two-column layout with synonyms
     return Response(
         render_template_string("""
-            <div class="synonym-counter">Remaining clues: {{ remaining }}</div>
             <div class="synonyms-container">
                 <div class="synonyms-column">
                     {% for word in displayed[::2] %}
@@ -506,6 +557,7 @@ def next_synonym():
                     {% endfor %}
                 </div>
             </div>
+            <div class="synonym-counter">Remaining clues: {{ remaining }}</div>
             <script>
                 document.getElementById('input-result').innerHTML = `
                     <div class="guesses">
