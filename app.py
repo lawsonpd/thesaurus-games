@@ -158,12 +158,19 @@ def process_input():
     session.modified = True
     
     if input_text == target_word:
-        session['game_active'] = False
+        # Add word to successful guesses
+        session['correct_words'].append({
+            'word': target_word,
+            'round': session['current_round']
+        })
+        session['current_round'] += 1
         session.modified = True
+        
         return Response(
             render_template_string("""
             <!-- Display Area -->
             <div class="display-section">
+                <div class="round-summary">Round {{ current_round - 1 }} completed!</div>
                 <div class="success-message">Congratulations! The word was '{{ target_word }}'</div>
                 <div class="synonyms-container">
                     <div class="synonyms-column">
@@ -192,18 +199,19 @@ def process_input():
             <!-- Game Control Section -->
             <div class="game-control-section">
                 <div id="game-buttons">
-                    <button class="game-button" 
-                            hx-post="/api/toggle-game"
-                            hx-target="#game-buttons"
+                    <button class="game-button next-round" 
+                            hx-post="/api/start-game"
+                            hx-target="#game-area"
                             hx-swap="innerHTML">
-                        Start Game
+                        Next Round
                     </button>
                 </div>
             </div>
             """, 
             target_word=target_word,
             guesses=guesses,
-            displayed=displayed),
+            displayed=displayed,
+            current_round=session['current_round']),
             headers={
                 "HX-Retarget": "#game-area",
                 "HX-Reswap": "innerHTML",
@@ -336,6 +344,12 @@ def start_game():
     session['displayed_synonyms'] = []
     session['game_active'] = True
     session['guesses'] = []
+    
+    # Initialize multi-round stats if not exists
+    if 'correct_words' not in session:
+        session['correct_words'] = []  # List of successfully guessed words
+        session['current_round'] = 1
+    
     session.modified = True
     
     # Return the initial game UI with the correct part of speech
@@ -347,7 +361,7 @@ def start_game():
             <h2 class="section-heading">The target word part of speech is {{ part_of_speech }}</h2>
             <h2 class="section-heading">The synonyms are:</h2>
             <div id="display-area"
-                 hx-trigger="load delay:100ms, every 4s"
+                 hx-trigger="load delay:100ms, every 7s"
                  hx-post="/api/next-synonym"
                  hx-swap="innerHTML">
                 <div class="synonym-counter">Remaining clues: {{ total_synonyms }}</div>
@@ -411,13 +425,25 @@ def next_synonym():
     # Check for game over condition first
     if len(displayed) >= len(all_synonyms):
         session['game_active'] = False
+        correct_words = session.get('correct_words', [])
+        final_round = session.get('current_round', 1)
         session.modified = True
+        
         return Response(
             render_template_string("""
                 <div class="game-over-message">
                     Game Over! The word was '{{ target_word }}'
                 </div>
-                <div>The synonyms were:</div>
+                <div class="game-stats">
+                    <h3>Final Score</h3>
+                    <p>You correctly guessed {{ correct_words|length }} words:</p>
+                    <ul class="word-list">
+                        {% for entry in correct_words %}
+                            <li>Round {{ entry.round }}: {{ entry.word }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div>The synonyms for the final word were:</div>
                 <div class="synonyms-container">
                     <div class="synonyms-column">
                         {% for word in displayed[::2] %}
@@ -435,12 +461,13 @@ def next_synonym():
                             hx-post="/api/toggle-game"
                             hx-target="#game-buttons"
                             hx-swap="innerHTML">
-                        Start Game
+                        Start New Game
                     </button>
                 </div>
             """, 
             displayed=displayed,
-            target_word=target_word),
+            target_word=target_word,
+            correct_words=correct_words),
             headers={
                 "HX-Reswap": "innerHTML",
                 "HX-Retarget": "#game-area"
