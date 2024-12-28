@@ -30,7 +30,8 @@ def get_random_word():
         }
         print(f"Requesting random word with params: {params}")
         response = requests.get(url, headers=headers, params=params)
-        print(f"Random word response: {response.text}")
+        # print(f"Random word response: {response.text}")
+        print("Got random word response")
         
         if response.status_code == 200:
             data = response.json()
@@ -83,8 +84,10 @@ def get_random_word_with_synonyms(min_synonyms=5):
 def get_multiple_words(count=5):
     """Get multiple words with their synonyms"""
     words = []
-    max_attempts = count * 4  # Allow multiple attempts per word
+    max_attempts = count * 8  # Increased from 4 to 8 attempts per word
     attempts = 0
+    
+    print(f"\nFetching {count} new words for cache...")
     
     while len(words) < count and attempts < max_attempts:
         attempts += 1
@@ -102,23 +105,29 @@ def get_multiple_words(count=5):
             'part_of_speech': part_of_speech,
             'synonyms': synonyms
         })
-        print(f"Added word {len(words)}/{count}: {word}")
+        print(f"Added to cache: {word} ({len(words)}/{count})")
     
+    print(f"Completed cache update with {len(words)} words after {attempts} attempts")
     return words
 
 def ensure_word_cache(session):
     """Ensure we have enough words in the cache"""
+    cache_size = len(session.get('word_cache', []))
+    print(f"\nChecking word cache. Current size: {cache_size}")  # Debug log
+
     if 'word_cache' not in session:
-        print("Initializing word cache with 10 words")
+        print("Cache empty. Initializing with 10 words...")  # Debug log
         session['word_cache'] = get_multiple_words(10)
         session.modified = True
-    elif len(session['word_cache']) <= 5:
-        print("Replenishing word cache with 5 more words")
+    elif cache_size <= 5:
+        print(f"Cache low ({cache_size} words). Adding 5 more...")  # Debug log
         new_words = get_multiple_words(5)
         session['word_cache'].extend(new_words)
         session.modified = True
+    else:
+        print(f"Cache sufficient ({cache_size} words)")  # Debug log
     
-    return bool(session['word_cache'])  # Return True if we have words available
+    return bool(session['word_cache'])
 
 @app.route('/')
 def index():
@@ -314,6 +323,10 @@ def toggle_game():
             <div id="game-area">
                 <div class="rules-section">
                     <h2>Starting game...</h2>
+                    <div class="loading-message">
+                        <p>Retrieving words...</p>
+                        <div class="loading-spinner"></div>
+                    </div>
                 </div>
             </div>
             <script>
@@ -359,22 +372,22 @@ def toggle_game():
 @app.route('/api/start-game', methods=['POST'])
 def start_game():
     """Initialize a new game"""
-    # Ensure we have words available
+    # Check cache at the start of each round
     if not ensure_word_cache(session):
-        session.clear()
-        session.modified = True
         return Response(
             render_template_string("""
-                <div class="error-message">
-                    Failed to start game. Could not find suitable words. Please try again.
-                </div>
-                <div id="game-buttons">
-                    <button class="game-button" 
-                            hx-post="/api/toggle-game"
-                            hx-target="#game-buttons"
-                            hx-swap="innerHTML">
-                        Start Game
-                    </button>
+                <div class="rules-section">
+                    <div class="error-message">
+                        Failed to retrieve enough words. Please try again.
+                    </div>
+                    <div id="game-buttons">
+                        <button class="game-button" 
+                                hx-post="/api/toggle-game"
+                                hx-target="#game-buttons"
+                                hx-swap="innerHTML">
+                            Try Again
+                        </button>
+                    </div>
                 </div>
             """),
             headers={
@@ -385,6 +398,9 @@ def start_game():
     
     # Get the next word from the cache
     word_data = session['word_cache'].pop(0)
+    print(f"\nUsing word from cache: {word_data['word']}")  # Debug log
+    print(f"Cache size after pop: {len(session['word_cache'])}")  # Debug log
+
     target_word = word_data['word']
     synonyms = word_data['synonyms']
     part_of_speech = word_data['part_of_speech']
