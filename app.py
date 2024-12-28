@@ -30,7 +30,8 @@ def get_random_word():
         }
         print(f"Requesting random word with params: {params}")
         response = requests.get(url, headers=headers, params=params)
-        print(f"Random word response: {response.text}")
+        # print(f"Random word response: {response.text}")
+        print("Got random word response")
         
         if response.status_code == 200:
             data = response.json()
@@ -86,6 +87,8 @@ def get_multiple_words(count=5):
     max_attempts = count * 4  # Allow multiple attempts per word
     attempts = 0
     
+    print(f"\nFetching {count} new words for cache...")  # Debug log
+
     while len(words) < count and attempts < max_attempts:
         attempts += 1
         word, part_of_speech, synonyms = get_random_word()
@@ -102,23 +105,29 @@ def get_multiple_words(count=5):
             'part_of_speech': part_of_speech,
             'synonyms': synonyms
         })
-        print(f"Added word {len(words)}/{count}: {word}")
+        print(f"Added to cache: {word} ({len(words)}/{count})")  # Debug log
     
+    print(f"Completed cache update with {len(words)} words\n")  # Debug log
     return words
 
 def ensure_word_cache(session):
     """Ensure we have enough words in the cache"""
+    cache_size = len(session.get('word_cache', []))
+    print(f"\nChecking word cache. Current size: {cache_size}")  # Debug log
+
     if 'word_cache' not in session:
-        print("Initializing word cache with 10 words")
+        print("Cache empty. Initializing with 10 words...")  # Debug log
         session['word_cache'] = get_multiple_words(10)
         session.modified = True
-    elif len(session['word_cache']) <= 5:
-        print("Replenishing word cache with 5 more words")
+    elif cache_size <= 5:
+        print(f"Cache low ({cache_size} words). Adding 5 more...")  # Debug log
         new_words = get_multiple_words(5)
         session['word_cache'].extend(new_words)
         session.modified = True
+    else:
+        print(f"Cache sufficient ({cache_size} words)")  # Debug log
     
-    return bool(session['word_cache'])  # Return True if we have words available
+    return bool(session['word_cache'])
 
 @app.route('/')
 def index():
@@ -359,7 +368,7 @@ def toggle_game():
 @app.route('/api/start-game', methods=['POST'])
 def start_game():
     """Initialize a new game"""
-    # Ensure we have words available
+    # Check cache at the start of each round
     if not ensure_word_cache(session):
         session.clear()
         session.modified = True
@@ -385,6 +394,9 @@ def start_game():
     
     # Get the next word from the cache
     word_data = session['word_cache'].pop(0)
+    print(f"\nUsing word from cache: {word_data['word']}")  # Debug log
+    print(f"Cache size after pop: {len(session['word_cache'])}")  # Debug log
+
     target_word = word_data['word']
     synonyms = word_data['synonyms']
     part_of_speech = word_data['part_of_speech']
