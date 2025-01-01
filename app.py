@@ -84,11 +84,11 @@ def get_random_word_with_synonyms(min_synonyms=5):
 def get_multiple_words(count=5):
     """Get multiple words with their synonyms"""
     words = []
-    max_attempts = count * 4  # Allow multiple attempts per word
+    max_attempts = count * 8  # Increased from 4 to 8 attempts per word
     attempts = 0
     
-    print(f"\nFetching {count} new words for cache...")  # Debug log
-
+    print(f"\nFetching {count} new words for cache...")
+    
     while len(words) < count and attempts < max_attempts:
         attempts += 1
         word, part_of_speech, synonyms = get_random_word()
@@ -105,9 +105,9 @@ def get_multiple_words(count=5):
             'part_of_speech': part_of_speech,
             'synonyms': synonyms
         })
-        print(f"Added to cache: {word} ({len(words)}/{count})")  # Debug log
+        print(f"Added to cache: {word} ({len(words)}/{count})")
     
-    print(f"Completed cache update with {len(words)} words\n")  # Debug log
+    print(f"Completed cache update with {len(words)} words after {attempts} attempts")
     return words
 
 def ensure_word_cache(session):
@@ -323,6 +323,10 @@ def toggle_game():
             <div id="game-area">
                 <div class="rules-section">
                     <h2>Starting game...</h2>
+                    <div class="loading-message">
+                        <p>Retrieving words...</p>
+                        <div class="loading-spinner"></div>
+                    </div>
                 </div>
             </div>
             <script>
@@ -370,20 +374,20 @@ def start_game():
     """Initialize a new game"""
     # Check cache at the start of each round
     if not ensure_word_cache(session):
-        session.clear()
-        session.modified = True
         return Response(
             render_template_string("""
-                <div class="error-message">
-                    Failed to start game. Could not find suitable words. Please try again.
-                </div>
-                <div id="game-buttons">
-                    <button class="game-button" 
-                            hx-post="/api/toggle-game"
-                            hx-target="#game-buttons"
-                            hx-swap="innerHTML">
-                        Start Game
-                    </button>
+                <div class="rules-section">
+                    <div class="error-message">
+                        Failed to retrieve enough words. Please try again.
+                    </div>
+                    <div id="game-buttons">
+                        <button class="game-button" 
+                                hx-post="/api/toggle-game"
+                                hx-target="#game-buttons"
+                                hx-swap="innerHTML">
+                            Try Again
+                        </button>
+                    </div>
                 </div>
             """),
             headers={
