@@ -10,6 +10,7 @@ if os.getenv('VERCEL_ENV') is None:  # We're in development
     from dotenv import load_dotenv
     load_dotenv()
 
+# Create Flask app - this needs to be named 'app' for Vercel
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here')
 
