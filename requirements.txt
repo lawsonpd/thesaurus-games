@@ -2,5 +2,4 @@ flask==3.0.2
 itsdangerous==2.1.2  # Required for session management
 requests==2.31.0  # For API calls
 pytest==8.0.0
-pytest-asyncio==0.23.5  # For testing async functions
 pytest-mock==3.12.0    # For mocking
