@@ -320,14 +320,10 @@ def toggle_game():
         
         return Response(
             render_template_string("""
-            <div id="game-area">
-                <div class="rules-section">
-                    <h2>Starting game...</h2>
-                    <div class="loading-message">
-                        <p>Retrieving words...</p>
-                        <div class="loading-spinner"></div>
-                    </div>
-                </div>
+            <div class="loading-message">
+                <h2>Starting game...</h2>
+                <p>Retrieving words...</p>
+                <div class="loading-spinner"></div>
             </div>
             <script>
                 htmx.ajax('POST', '/api/start-game', {
@@ -335,7 +331,11 @@ def toggle_game():
                     swap: 'innerHTML'
                 });
             </script>
-            """)
+            """),
+            headers={
+                "HX-Retarget": "#game-area",
+                "HX-Reswap": "innerHTML"
+            }
         )
     else:  # Resetting game
         session.clear()  # This will clear everything including word cache
@@ -398,8 +398,8 @@ def start_game():
     
     # Get the next word from the cache
     word_data = session['word_cache'].pop(0)
-    print(f"\nUsing word from cache: {word_data['word']}")  # Debug log
-    print(f"Cache size after pop: {len(session['word_cache'])}")  # Debug log
+    print(f"\nUsing word from cache: {word_data['word']}")
+    print(f"Cache size after pop: {len(session['word_cache'])}")
 
     target_word = word_data['word']
     synonyms = word_data['synonyms']
@@ -420,53 +420,56 @@ def start_game():
     
     session.modified = True
     
-    # Return the initial game UI
+    # Return the initial game UI without rules section
     total_synonyms = len(synonyms)
     return Response(
         render_template_string("""
-        <!-- Display Area -->
-        <div class="display-section">
-            <h2 class="section-heading">The target word part of speech is {{ part_of_speech }}</h2>
-            <h2 class="section-heading">The synonyms are:</h2>
-            <div id="display-area"
-                 hx-trigger="load delay:100ms, every 7s"
-                 hx-post="/api/next-synonym"
-                 hx-swap="innerHTML">
-                <div class="synonyms-container">
+        <!-- Game Area -->
+        <div class="game-container">
+            <!-- Display Area -->
+            <div class="display-section">
+                <h2 class="section-heading">The target word part of speech is {{ part_of_speech }}</h2>
+                <h2 class="section-heading">The synonyms are:</h2>
+                <div id="display-area"
+                     hx-trigger="load delay:100ms, every 7s"
+                     hx-post="/api/next-synonym"
+                     hx-swap="innerHTML">
+                    <div class="synonyms-container">
+                    </div>
+                    <div class="synonym-counter">Remaining clues: {{ total_synonyms }}</div>
                 </div>
-                <div class="synonym-counter">Remaining clues: {{ total_synonyms }}</div>
             </div>
-        </div>
 
-        <!-- Game Status -->
-        <div id="game-status"></div>
+            <!-- Game Status -->
+            <div id="game-status"></div>
 
-        <!-- Input Area -->
-        <div class="input-section">
-            <h2>Guess the common parent word</h2>
-            <form hx-post="/api/process-input" 
-                  hx-target="#input-result"
-                  hx-on::after-request="this.reset()">
-                <input type="text" 
-                       name="text" 
-                       placeholder="Enter text here..."
-                       pattern="[A-Za-z]+"
-                       title="Please enter only alphabetic characters"
-                       required>
-                <button type="submit">Submit</button>
-            </form>
-            <div id="input-result"></div>
-        </div>
+            <!-- Input Area -->
+            <div class="input-section">
+                <h2>Guess the common parent word</h2>
+                <form hx-post="/api/process-input" 
+                      hx-target="#input-result"
+                      hx-on::after-request="this.reset()">
+                    <input type="text" 
+                           name="text" 
+                           placeholder="Enter text here..."
+                           pattern="[A-Za-z]+"
+                           title="Please enter only alphabetic characters"
+                           required>
+                    <button type="submit">Submit</button>
+                </form>
+                <div id="input-result"></div>
+            </div>
 
-        <!-- Game Control Section -->
-        <div class="game-control-section">
-            <div id="game-buttons">
-                <button class="game-button reset" 
-                        hx-post="/api/toggle-game"
-                        hx-target="#game-buttons"
-                        hx-swap="innerHTML">
-                    Reset
-                </button>
+            <!-- Game Control Section -->
+            <div class="game-control-section">
+                <div id="game-buttons">
+                    <button class="game-button reset" 
+                            hx-post="/api/toggle-game"
+                            hx-target="#game-buttons"
+                            hx-swap="innerHTML">
+                        Reset
+                    </button>
+                </div>
             </div>
         </div>
         """, 
