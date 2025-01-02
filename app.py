@@ -3,6 +3,12 @@ import requests
 import random
 import os
 from dotenv import load_dotenv
+import asyncio
+import aiohttp
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
+from threading import Lock
+import time
 
 load_dotenv()  # Load environment variables
 
@@ -14,120 +20,194 @@ WORDS_API_KEY = os.getenv('RAPIDAPI_KEY')
 
 print(f"API Key loaded: {'*' * len(WORDS_API_KEY) if WORDS_API_KEY else 'None'}")  # Debug log - masks the key
 
-def get_random_word():
-    """Get a random word from the API with frequency filter"""
+# Global cache and lock
+word_cache = []
+cache_lock = Lock()
+
+async def fetch_word_async(session):
+    """Async function to fetch a random word"""
     url = f"https://{WORDS_API_HOST}/words/"
     headers = {
         "x-rapidapi-key": WORDS_API_KEY,
         "x-rapidapi-host": WORDS_API_HOST
     }
+    params = {
+        "random": "true",
+        "hasDetails": "frequency,partOfSpeech",
+        "frequencyMin": "4.0"
+    }
     
     try:
-        params = {
-            "random": "true",
-            "hasDetails": "frequency,partOfSpeech",
-            "frequencyMin": "3.0"
-        }
-        print(f"Requesting random word with params: {params}")
-        response = requests.get(url, headers=headers, params=params)
-        # print(f"Random word response: {response.text}")
-        print("Got random word response")
+        # Try up to 3 times per word
+        for _ in range(3):
+            async with session.get(url, headers=headers, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    word = data.get('word')
+                    
+                    # Get word details
+                    details_url = f"https://{WORDS_API_HOST}/words/{word}"
+                    async with session.get(details_url, headers=headers) as details_response:
+                        if details_response.status == 200:
+                            details = await details_response.json()
+                            results = details.get('results', [])
+                            
+                            results_with_synonyms = [r for r in results 
+                                                   if r.get('synonyms') and r.get('partOfSpeech')]
+                            
+                            if results_with_synonyms:
+                                result = max(results_with_synonyms, 
+                                          key=lambda x: len(x.get('synonyms', [])))
+                                synonyms = result.get('synonyms', [])
+                                
+                                if len(synonyms) >= 5:
+                                    return {
+                                        'word': word,
+                                        'part_of_speech': result.get('partOfSpeech'),
+                                        'synonyms': synonyms
+                                    }
+            
+            # Small delay between attempts
+            await asyncio.sleep(0.1)
         
-        if response.status_code == 200:
-            data = response.json()
-            # Get all results that have synonyms
-            results = [r for r in data.get('results', []) 
-                      if r.get('synonyms') and r.get('partOfSpeech')]
-            
-            if not results:
-                return None, None, None
-                
-            # Choose a random result that has synonyms
-            result = random.choice(results)
-            word = data.get('word')
-            part_of_speech = result.get('partOfSpeech')
-            synonyms = result.get('synonyms', [])
-            
-            print(f"Got word: {word} ({part_of_speech}) with synonyms: {synonyms}")
-            return word, part_of_speech, synonyms
-        else:
-            print(f"Error getting random word: {response.text}")
-            return None, None, None
+        return None
     except Exception as e:
-        print(f"Exception getting random word: {str(e)}")
-        return None, None, None
+        print(f"Error in fetch_word_async: {str(e)}")
+        return None
 
-def get_random_word_with_synonyms(min_synonyms=5):
-    """Get a random word that has enough synonyms"""
-    max_attempts_per_word = 5
-    max_total_attempts = 20
-    total_attempts = 0
-    
-    while total_attempts < max_total_attempts:
-        for _ in range(max_attempts_per_word):
-            total_attempts += 1
-            word, part_of_speech, synonyms = get_random_word()
-            if not word or not synonyms:
-                continue
-                
-            if len(synonyms) >= min_synonyms:
-                print(f"Found suitable word '{word}' ({part_of_speech}) with {len(synonyms)} synonyms")
-                return word, synonyms, part_of_speech
-            else:
-                print(f"Skipping word '{word}' ({part_of_speech}) with only {len(synonyms)} synonyms")
+async def fetch_multiple_words_async(count=5):
+    """Async function to fetch multiple words"""
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        # Request 4x the number we need to ensure we get enough valid ones
+        for _ in range(count * 4):
+            tasks.append(fetch_word_async(session))
         
-        print(f"No suitable word found in batch, trying again...")
-    
-    print(f"Failed to find suitable word after {total_attempts} attempts")
-    return None, None, None
+        results = await asyncio.gather(*tasks)
+        valid_words = [word for word in results if word is not None]
+        
+        # Remove duplicates
+        seen = set()
+        unique_words = []
+        for word in valid_words:
+            if word['word'] not in seen:
+                seen.add(word['word'])
+                unique_words.append(word)
+        
+        return unique_words[:count]
 
-def get_multiple_words(count=5):
-    """Get multiple words with their synonyms"""
-    words = []
-    max_attempts = count * 8  # Increased from 4 to 8 attempts per word
-    attempts = 0
+def start_async_cache_update(count=5):
+    """Start async word fetching in a background thread"""
+    async def update_cache():
+        words = await fetch_multiple_words_async(count)
+        with cache_lock:
+            global word_cache
+            word_cache.extend(words)
+            print(f"Added {len(words)} words to global cache. New size: {len(word_cache)}")
     
-    print(f"\nFetching {count} new words for cache...")
+    def run_async():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(update_cache())
+        loop.close()
     
-    while len(words) < count and attempts < max_attempts:
-        attempts += 1
-        word, part_of_speech, synonyms = get_random_word()
-        
-        if not word or not synonyms or len(synonyms) < 5:
-            continue
-            
-        # Check if we already have this word
-        if any(w['word'] == word for w in words):
-            continue
-            
-        words.append({
-            'word': word,
-            'part_of_speech': part_of_speech,
-            'synonyms': synonyms
-        })
-        print(f"Added to cache: {word} ({len(words)}/{count})")
-    
-    print(f"Completed cache update with {len(words)} words after {attempts} attempts")
-    return words
+    # Run in a separate thread
+    executor = ThreadPoolExecutor(max_workers=1)
+    executor.submit(run_async)
 
 def ensure_word_cache(session):
     """Ensure we have enough words in the cache"""
-    cache_size = len(session.get('word_cache', []))
-    print(f"\nChecking word cache. Current size: {cache_size}")  # Debug log
-
-    if 'word_cache' not in session:
-        print("Cache empty. Initializing with 10 words...")  # Debug log
-        session['word_cache'] = get_multiple_words(10)
-        session.modified = True
-    elif cache_size <= 5:
-        print(f"Cache low ({cache_size} words). Adding 5 more...")  # Debug log
-        new_words = get_multiple_words(5)
-        session['word_cache'].extend(new_words)
-        session.modified = True
-    else:
-        print(f"Cache sufficient ({cache_size} words)")  # Debug log
+    global word_cache
     
-    return bool(session['word_cache'])
+    with cache_lock:
+        cache_size = len(word_cache)
+        print(f"\nChecking word cache. Current size: {cache_size}")
+    
+    try:
+        if cache_size == 0:
+            print("Cache empty. Getting initial word...")
+            max_attempts = 10  # Increase max attempts
+            for attempt in range(max_attempts):
+                word_data = get_random_word()
+                if word_data[0]:  # If we got a valid word
+                    with cache_lock:
+                        word_cache = [{
+                            'word': word_data[0],
+                            'part_of_speech': word_data[1],
+                            'synonyms': word_data[2]
+                        }]
+                    print(f"Got initial word on attempt {attempt + 1}")
+                    # Start async cache population after setting initial word
+                    start_async_cache_update(10)
+                    return True
+                print(f"Failed to get initial word, attempt {attempt + 1}/{max_attempts}")
+            
+            print("Failed to get initial word after all attempts")
+            return False
+            
+        elif cache_size <= 5:
+            print(f"Cache low ({cache_size} words). Adding 5 more...")
+            start_async_cache_update(5)
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error in ensure_word_cache: {str(e)}")
+        return False
+
+def get_random_word():
+    """Get a random word from the API synchronously"""
+    url = f"https://{WORDS_API_HOST}/words/"
+    headers = {
+        "x-rapidapi-key": WORDS_API_KEY,
+        "x-rapidapi-host": WORDS_API_HOST
+    }
+    params = {
+        "random": "true",
+        "hasDetails": "frequency,partOfSpeech",
+        "frequencyMin": "4.0"
+    }
+    
+    try:
+        # Try up to 3 times to get a word with enough synonyms
+        for _ in range(3):
+            response = requests.get(url, headers=headers, params=params)
+            print(f"API Response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                word = data.get('word')
+                print(f"Word data: {word}")
+                
+                # Try to get word directly with details
+                details_url = f"https://{WORDS_API_HOST}/words/{word}"
+                details_response = requests.get(details_url, headers=headers)
+                
+                if details_response.status_code == 200:
+                    details = details_response.json()
+                    results = details.get('results', [])
+                    print(f"Results count: {len(results)}")
+                    
+                    # Get all results that have synonyms
+                    results_with_synonyms = [r for r in results 
+                                           if r.get('synonyms') and r.get('partOfSpeech')]
+                    
+                    if results_with_synonyms:
+                        # Choose result with most synonyms
+                        result = max(results_with_synonyms, 
+                                   key=lambda x: len(x.get('synonyms', [])))
+                        synonyms = result.get('synonyms', [])
+                        
+                        if len(synonyms) >= 5:
+                            return word, result.get('partOfSpeech'), synonyms
+            
+            # Small delay between attempts
+            time.sleep(0.1)
+        
+        return None, None, None
+    except Exception as e:
+        print(f"Exception getting random word: {str(e)}")
+        return None, None, None
 
 @app.route('/')
 def index():
@@ -372,6 +452,8 @@ def toggle_game():
 @app.route('/api/start-game', methods=['POST'])
 def start_game():
     """Initialize a new game"""
+    global word_cache
+    
     # Check cache at the start of each round
     if not ensure_word_cache(session):
         return Response(
@@ -397,9 +479,10 @@ def start_game():
         )
     
     # Get the next word from the cache
-    word_data = session['word_cache'].pop(0)
+    with cache_lock:
+        word_data = word_cache.pop(0)
     print(f"\nUsing word from cache: {word_data['word']}")
-    print(f"Cache size after pop: {len(session['word_cache'])}")
+    print(f"Cache size after pop: {len(word_cache)}")
 
     target_word = word_data['word']
     synonyms = word_data['synonyms']

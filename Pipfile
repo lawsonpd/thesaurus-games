@@ -5,7 +5,10 @@ name = "pypi"
 
 [packages]
 flask = "==3.0.2"
-itsdangerous = "==2.1.2"
+itsdangerous = "*"
+requests = "*"
+aiohttp = "*"
+asyncio = "*"
 
 [dev-packages]
 

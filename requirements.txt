@@ -2,3 +2,5 @@ flask==3.0.2
 itsdangerous==2.1.2  # Required for session management
 requests==2.31.0  # For API calls
 python-dotenv==1.0.1  # For environment variables 
+aiohttp==3.9.1
+asyncio==3.4.3 
