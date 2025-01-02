@@ -9,6 +9,9 @@ itsdangerous = "*"
 requests = "*"
 aiohttp = "*"
 asyncio = "*"
+pytest = "*"
+pytest-asyncio = "*"
+pytest-mock = "*"
 
 [dev-packages]
 
