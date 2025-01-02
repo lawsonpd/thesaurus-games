@@ -1,8 +1,7 @@
+import os
 from flask import Flask, render_template, request, jsonify, session, Response, render_template_string
 import requests
 import random
-import os
-from dotenv import load_dotenv
 import asyncio
 import aiohttp
 from concurrent.futures import ThreadPoolExecutor
@@ -10,10 +9,13 @@ from functools import partial
 from threading import Lock
 import time
 
-load_dotenv()  # Load environment variables
+# Only load dotenv in development
+if os.getenv('VERCEL_ENV') is None:  # We're in development
+    from dotenv import load_dotenv
+    load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-here'
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here')
 
 WORDS_API_HOST = "wordsapiv1.p.rapidapi.com"
 WORDS_API_KEY = os.getenv('RAPIDAPI_KEY')
