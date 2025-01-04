@@ -33,12 +33,13 @@ def get_random_word():
     params = {
         "random": "true",
         "hasDetails": "frequency,partOfSpeech",
-        "frequencyMin": "5.0"
+        "frequencyMin": "4.5"
     }
     
     try:
         # Try up to 3 times to get a word with enough synonyms
-        for _ in range(3):
+        for attempt in range(3):
+            print(f"Attempt {attempt + 1} to get random word")
             response = requests.get(url, headers=headers, params=params)
             print(f"API Response status: {response.status_code}")
             
@@ -50,6 +51,7 @@ def get_random_word():
                 # Try to get word details
                 details_url = f"https://{WORDS_API_HOST}/words/{word}"
                 details_response = requests.get(details_url, headers=headers)
+                print(f"Details response status: {details_response.status_code}")
                 
                 if details_response.status_code == 200:
                     details = details_response.json()
@@ -67,15 +69,23 @@ def get_random_word():
                         synonyms = result.get('synonyms', [])
                         
                         if len(synonyms) >= 5:
+                            print(f"Found suitable word: {word} with {len(synonyms)} synonyms")
                             return {
                                 'word': word,
                                 'part_of_speech': result.get('partOfSpeech'),
                                 'synonyms': synonyms
                             }
+                        else:
+                            print(f"Word {word} had insufficient synonyms: {len(synonyms)}")
+                    else:
+                        print(f"No results with synonyms for word: {word}")
+            else:
+                print(f"Error response from API: {response.text}")
             
             # Small delay between attempts
             time.sleep(0.1)
         
+        print("Failed to get suitable word after all attempts")
         return None
     except Exception as e:
         print(f"Exception getting random word: {str(e)}")
