@@ -116,7 +116,7 @@ def ensure_word_cache():
         
         return True
 
-@app.route('/')
+@app.route('/target')
 def index():
     return render_template('index.html')
 
@@ -299,18 +299,14 @@ def toggle_game():
     was_active = session.get('game_active', False)
     
     if not was_active:  # Starting new game
-        # Clear everything except word cache
-        word_cache = session.get('word_cache', [])
-        session.clear()
-        session['word_cache'] = word_cache  # Restore word cache
-        session.modified = True
-        
         return Response(
             render_template_string("""
-            <div class="loading-message">
-                <h2>Starting game...</h2>
-                <p>Retrieving words...</p>
-                <div class="loading-spinner"></div>
+            <div class="message is-info">
+                <div class="message-body">
+                    <h2>Starting game...</h2>
+                    <p>Retrieving words...</p>
+                    <div class="loading-spinner"></div>
+                </div>
             </div>
             <script>
                 htmx.ajax('POST', '/api/start-game', {
@@ -415,37 +411,40 @@ def start_game():
     return Response(
         render_template_string("""
         <!-- Game Area -->
-        <div class="game-container">
+        <div class="game-container box">
             <!-- Display Area -->
             <div class="display-section">
-                <h2 class="section-heading">The target word part of speech is {{ part_of_speech }}</h2>
-                <h2 class="section-heading">The synonyms are:</h2>
+                <h2 class="subtitle">The target word part of speech is {{ part_of_speech }}</h2>
                 <div id="display-area"
                      hx-trigger="load delay:100ms, every 7s"
                      hx-post="/api/next-synonym"
                      hx-swap="innerHTML">
                     <div class="synonyms-container">
                     </div>
-                    <div class="synonym-counter">Remaining clues: {{ total_synonyms }}</div>
+                    <div class="tag is-info is-medium">Remaining clues: {{ total_synonyms }}</div>
                 </div>
             </div>
 
-            <!-- Game Status -->
-            <div id="game-status"></div>
-
             <!-- Input Area -->
             <div class="input-section">
-                <h2>Guess the common parent word</h2>
+                <h2 class="subtitle">Guess the target word</h2>
                 <form hx-post="/api/process-input" 
                       hx-target="#input-result"
                       hx-on::after-request="this.reset()">
-                    <input type="text" 
-                           name="text" 
-                           placeholder="Enter text here..."
-                           pattern="[A-Za-z]+"
-                           title="Please enter only alphabetic characters"
-                           required>
-                    <button type="submit">Submit</button>
+                    <div class="field has-addons">
+                        <div class="control is-expanded">
+                            <input class="input" 
+                                   type="text" 
+                                   name="text" 
+                                   placeholder="Enter text here..."
+                                   pattern="[A-Za-z]+"
+                                   title="Please enter only alphabetic characters"
+                                   required>
+                        </div>
+                        <div class="control">
+                            <button class="button is-primary" type="submit">Submit</button>
+                        </div>
+                    </div>
                 </form>
                 <div id="input-result"></div>
             </div>
@@ -453,7 +452,7 @@ def start_game():
             <!-- Game Control Section -->
             <div class="game-control-section">
                 <div id="game-buttons">
-                    <button class="game-button reset" 
+                    <button class="button is-danger game-button reset" 
                             hx-post="/api/toggle-game"
                             hx-target="#game-buttons"
                             hx-swap="innerHTML">

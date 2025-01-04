@@ -1,17 +1,78 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Target Practice</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+    <style>
+        /* Keep existing styles but update for Bulma compatibility */
+        .game-container {
+            padding: 1rem;
+        }
+        
+        .synonyms-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        
+        .synonym {
+            margin: 0.25rem;
+            padding: 0.5rem 1rem;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+        }
+        
+        .loading-spinner {
+            /* Keep existing spinner styles */
+        }
+        
+        @media screen and (max-width: 768px) {
+            .game-container {
+                padding: 0.5rem;
+            }
+            
+            .section-heading {
+                font-size: 1.25rem;
+            }
+            
+            .input-section input {
+                width: 100%;
+                margin-bottom: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <section class="section">
+        <div class="container">
+            <h1 class="title">Target Practice</h1>
+            <div class="content">
+                <div id="game-area">
+                    <!-- Rules Section -->
+                    <div class="rules-section">
+                        <h2 class="subtitle">How to play:</h2>
+                        <p class="rules-text">
+                            The goal is to guess the target word. Synonyms of the target word will be shown one after another. 
+                            Guess the target word before you run out of clues!
+                        </p>
+                    </div>
 
-{% block content %}
-<div class="container">
-    <h1>Flask + HTMX Demo</h1>
-    
-    <div id="content">
-        <p>Initial content</p>
-    </div>
-
-    <button hx-get="/load-more"
-            hx-target="#content"
-            hx-swap="beforeend">
-        Load More
-    </button>
-</div>
-{% endblock %} 
+                    <!-- Game Control Section -->
+                    <div class="game-control-section">
+                        <div id="game-buttons">
+                            <button class="button is-primary game-button" 
+                                    hx-post="/api/toggle-game"
+                                    hx-target="#game-buttons"
+                                    hx-swap="innerHTML">
+                                Start Game
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</body>
+</html> 
