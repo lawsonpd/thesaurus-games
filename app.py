@@ -97,13 +97,19 @@ def get_multiple_words(count=5):
     max_attempts = count * 4  # Request 4x the number we need
     attempts = 0
     
+    print(f"Attempting to get {count} words...")
     while len(words) < count and attempts < max_attempts:
         attempts += 1
+        print(f"\nAttempt {attempts}/{max_attempts} to get word {len(words) + 1}/{count}")
         word_data = get_random_word()
         
         if word_data and word_data['word'] not in [w['word'] for w in words]:
+            print(f"Added word: {word_data['word']}")
             words.append(word_data)
+        else:
+            print("Word was rejected (None or duplicate)")
     
+    print(f"Found {len(words)} words after {attempts} attempts")
     return words
 
 def ensure_word_cache():
@@ -117,13 +123,18 @@ def ensure_word_cache():
         if cache_size == 0:
             print("Cache empty. Getting words...")
             new_words = get_multiple_words(10)
+            if not new_words:
+                print("Failed to get any words")
+                return False
             word_cache.extend(new_words)
+            print(f"Added {len(new_words)} words to cache")
             return bool(word_cache)
             
         elif cache_size <= 5:
             print(f"Cache low ({cache_size} words). Adding 5 more...")
             new_words = get_multiple_words(5)
             word_cache.extend(new_words)
+            print(f"Added {len(new_words)} additional words to cache")
         
         return True
 
