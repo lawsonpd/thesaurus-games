@@ -33,7 +33,7 @@ def get_random_word():
     params = {
         "random": "true",
         "hasDetails": "frequency,partOfSpeech",
-        "frequencyMin": "4.0"
+        "frequencyMin": "5.0"
     }
     
     try:
