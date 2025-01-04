@@ -4,7 +4,10 @@
         {
             "src": "api/index.py",
             "use": "@vercel/python",
-            "config": { "runtime": "python3.9" }
+            "config": { 
+                "runtime": "python3.9",
+                "pip": ["flask==3.0.2", "requests==2.31.0", "itsdangerous==2.1.2"]
+            }
         }
     ],
     "routes": [

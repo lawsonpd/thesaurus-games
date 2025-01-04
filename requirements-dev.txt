@@ -1,5 +1,6 @@
-flask>=2.0.0
+flask==3.0.2
 itsdangerous==2.1.2  # Required for session management
 requests==2.31.0  # For API calls
 pytest==8.0.0
 pytest-mock==3.12.0    # For mocking
+python-dotenv==1.0.1   # For local development only 
