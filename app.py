@@ -40,7 +40,7 @@ def get_random_word():
         # Try up to 3 times to get a word with enough synonyms
         for attempt in range(3):
             print(f"Attempt {attempt + 1} to get random word")
-            response = requests.get(url, headers=headers, params=params)
+            response = requests.get(url, headers=headers, params=params, timeout=5)
             print(f"API Response status: {response.status_code}")
             
             if response.status_code == 200:
@@ -50,7 +50,7 @@ def get_random_word():
                 
                 # Try to get word details
                 details_url = f"https://{WORDS_API_HOST}/words/{word}"
-                details_response = requests.get(details_url, headers=headers)
+                details_response = requests.get(details_url, headers=headers, timeout=5)
                 print(f"Details response status: {details_response.status_code}")
                 
                 if details_response.status_code == 200:
@@ -94,7 +94,7 @@ def get_random_word():
 def get_multiple_words(count=5):
     """Get multiple words synchronously"""
     words = []
-    max_attempts = count * 4  # Request 4x the number we need
+    max_attempts = count * 2  # Reduce attempts to avoid timeout
     attempts = 0
     
     print(f"Attempting to get {count} words...")
@@ -110,7 +110,8 @@ def get_multiple_words(count=5):
             print("Word was rejected (None or duplicate)")
     
     print(f"Found {len(words)} words after {attempts} attempts")
-    return words
+    # Return what we have even if we didn't get the full count
+    return words if words else None
 
 def ensure_word_cache():
     """Ensure we have enough words in the cache"""
@@ -122,7 +123,7 @@ def ensure_word_cache():
         
         if cache_size == 0:
             print("Cache empty. Getting words...")
-            new_words = get_multiple_words(10)
+            new_words = get_multiple_words(3)  # Start with fewer words
             if not new_words:
                 print("Failed to get any words")
                 return False
