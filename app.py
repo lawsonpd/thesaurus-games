@@ -33,7 +33,7 @@ def get_random_word():
     params = {
         "random": "true",
         "hasDetails": "frequency,partOfSpeech",
-        "frequencyMin": "4.5"
+        "frequencyMin": "5.5"
     }
     
     try:
@@ -68,7 +68,7 @@ def get_random_word():
                                    key=lambda x: len(x.get('synonyms', [])))
                         synonyms = result.get('synonyms', [])
                         
-                        if len(synonyms) >= 5:
+                        if len(synonyms) >= 3:
                             print(f"Found suitable word: {word} with {len(synonyms)} synonyms")
                             return {
                                 'word': word,
@@ -94,7 +94,7 @@ def get_random_word():
 def get_multiple_words(count=5):
     """Get multiple words synchronously"""
     words = []
-    max_attempts = count * 2  # Reduce attempts to avoid timeout
+    max_attempts = count * 3  # Give more attempts per word
     attempts = 0
     
     print(f"Attempting to get {count} words...")
@@ -123,7 +123,7 @@ def ensure_word_cache():
         
         if cache_size == 0:
             print("Cache empty. Getting words...")
-            new_words = get_multiple_words(3)  # Start with fewer words
+            new_words = get_multiple_words(2)  # Start with just 2 words
             if not new_words:
                 print("Failed to get any words")
                 return False
@@ -131,9 +131,9 @@ def ensure_word_cache():
             print(f"Added {len(new_words)} words to cache")
             return bool(word_cache)
             
-        elif cache_size <= 5:
-            print(f"Cache low ({cache_size} words). Adding 5 more...")
-            new_words = get_multiple_words(5)
+        elif cache_size <= 2:  # Lower threshold
+            print(f"Cache low ({cache_size} words). Adding 2 more...")
+            new_words = get_multiple_words(2)
             word_cache.extend(new_words)
             print(f"Added {len(new_words)} additional words to cache")
         
