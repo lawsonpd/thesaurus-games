@@ -481,7 +481,7 @@ def start_game():
                             <span class="synonym-word">{{ word }}</span>
                         {% endfor %}
                     </div>
-                    <div class="tag is-info is-medium">Remaining clues: {{ total_synonyms }}</div>
+                    <div class="synonym-counter">Remaining clues: {{ total_synonyms }}</div>
                 </div>
             </div>
 
