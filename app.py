@@ -242,7 +242,7 @@ def process_input():
                 </div>
                 <div class="success-message">Congratulations! The word was '{{ target_word }}'</div>
                 <div class="box mt-4">
-                    <h3 class="subtitle is-6 mb-2">All synonyms for this word:</h3>
+                    <h3 class="subtitle is-6 mb-2">All synonyms for this {{ target_word }}:</h3>
                     <div class="tags are-medium">
                         {% for word in displayed %}
                             <span class="tag">{{ word }}</span>
@@ -254,7 +254,7 @@ def process_input():
             <!-- Input Area -->
             <div class="input-section">
                 <div class="box mt-4">
-                    <h3 class="subtitle is-6 mb-2">Your guesses:</h3>
+                    <h3 class="subtitle is-6 mb-2">Your guesses for {{target_word }}:</h3>
                     <div class="tags are-medium">
                         {% for guess in guesses %}
                             <span class="tag">{{ guess }}</span>
@@ -267,12 +267,10 @@ def process_input():
             {% if correct_words|length > 1 %}
                 <div class="box mt-4">
                     <h3 class="subtitle is-6 mb-2">Previous target words:</h3>
-                    <div class="content">
-                        <ul class="word-list">
-                            {% for entry in correct_words[:-1] %}
-                                <li>Round {{ entry.round }}: {{ entry.word }}</li>
-                            {% endfor %}
-                        </ul>
+                    <div class="tags are-medium">
+                        {% for entry in correct_words[:-1] %}
+                            <span class="tag">Round {{ entry.round }}: {{ entry.word }}</span>
+                        {% endfor %}
                     </div>
                 </div>
             {% endif %}
