@@ -229,29 +229,31 @@ def process_input():
             render_template_string("""
             <!-- Display Area -->
             <div class="display-section">
-                <div class="round-summary">Round {{ current_round - 1 }} completed!</div>
+                <div class="notification is-success has-text-centered" style="max-width: 500px; margin: 1rem auto;">
+                    <h2 class="title is-4 mb-0">Round {{ current_round - 1 }} completed!</h2>
+                </div>
                 <div class="success-message">Congratulations! The word was '{{ target_word }}'</div>
-                <div class="synonyms-container">
-                    <div class="synonyms-column">
-                        {% for word in displayed[::2] %}
-                            <span class="synonym-word">{{ word }}</span>
-                        {% endfor %}
-                    </div>
-                    <div class="synonyms-column">
-                        {% for word in displayed[1::2] %}
-                            <span class="synonym-word">{{ word }}</span>
-                        {% endfor %}
+                <div class="box mt-4">
+                    <h3 class="subtitle is-6 mb-2">All synonyms for this word:</h3>
+                    <div class="content">
+                        <ul class="synonym-list">
+                            {% for word in displayed %}
+                                <li>{{ word }}</li>
+                            {% endfor %}
+                        </ul>
                     </div>
                 </div>
             </div>
 
             <!-- Input Area -->
             <div class="input-section">
-                <div class="guesses">
-                    <div class="success-message">Your guesses:</div>
-                    {% for guess in guesses %}
-                        <span class="guess">{{ guess }}</span>
-                    {% endfor %}
+                <div class="box mt-4">
+                    <h3 class="subtitle is-6 mb-2">Your guesses:</h3>
+                    <div class="tags are-medium">
+                        {% for guess in guesses %}
+                            <span class="tag">{{ guess }}</span>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
 
@@ -324,7 +326,7 @@ def toggle_game():
     if not was_active:  # Starting new game
         return Response(
             render_template_string("""
-            <div class="message is-info">
+            <div class="message is-info" style="max-width: 400px; margin: 0 auto;">
                 <div class="message-body">
                     <h2>Starting game...</h2>
                     <p>Retrieving words...</p>
@@ -443,6 +445,16 @@ def start_game():
                      hx-post="/api/next-synonym"
                      hx-swap="innerHTML">
                     <div class="synonyms-container">
+                        <div class="synonyms-column">
+                            {% for word in displayed[::2] %}
+                                <span class="synonym-word">{{ word }}</span>
+                            {% endfor %}
+                        </div>
+                        <div class="synonyms-column">
+                            {% for word in displayed[1::2] %}
+                                <span class="synonym-word">{{ word }}</span>
+                            {% endfor %}
+                        </div>
                     </div>
                     <div class="tag is-info is-medium">Remaining clues: {{ total_synonyms }}</div>
                 </div>
@@ -486,7 +498,8 @@ def start_game():
         </div>
         """, 
         part_of_speech=part_of_speech,
-        total_synonyms=total_synonyms),
+        total_synonyms=total_synonyms,
+        displayed=session.get('displayed_synonyms', [])),
         headers={
             "HX-Retarget": "#game-area",
             "HX-Reswap": "innerHTML"
@@ -527,16 +540,13 @@ def next_synonym():
                     </ul>
                 </div>
                 <div>The synonyms for the final word were:</div>
-                <div class="synonyms-container">
-                    <div class="synonyms-column">
-                        {% for word in displayed[::2] %}
-                            <span class="synonym-word">{{ word }}</span>
-                        {% endfor %}
-                    </div>
-                    <div class="synonyms-column">
-                        {% for word in displayed[1::2] %}
-                            <span class="synonym-word">{{ word }}</span>
-                        {% endfor %}
+                <div class="box mt-4">
+                    <div class="content">
+                        <ul class="synonym-list">
+                            {% for word in displayed %}
+                                <li>{{ word }}</li>
+                            {% endfor %}
+                        </ul>
                     </div>
                 </div>
                 <div id="game-buttons">
@@ -609,4 +619,4 @@ def next_synonym():
     )
 
 if __name__ == '__main__':
-    app.run(debug=True) 
+    app.run(debug=True)

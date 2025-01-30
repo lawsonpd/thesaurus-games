@@ -9,23 +9,119 @@
         /* Keep existing styles but update for Bulma compatibility */
         .game-container {
             padding: 1rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .content {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .rules-section {
+            background-color: #f5f5f5;
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 2rem auto;
+            max-width: 500px;
+        }
+        
+        .rules-text {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: #4a4a4a;
+            margin-top: 1rem;
+        }
+        
+        .game-control-section {
+            text-align: center;
+            margin-top: 2rem;
+        }
+        
+        .title {
+            color: #363636;
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 2.5rem;
         }
         
         .synonyms-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin: 1rem 0;
         }
         
-        .synonym {
+        .synonym-word {
             margin: 0.25rem;
             padding: 0.5rem 1rem;
-            background-color: #f5f5f5;
+            background-color: #e3f2fd;
             border-radius: 4px;
+            color: #1976d2;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: block;
+            text-align: center;
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        .input-section .field {
+            max-width: 400px;
+            margin: 0 auto;
         }
         
         .loading-spinner {
             /* Keep existing spinner styles */
+        }
+        
+        .game-button {
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            min-width: 160px;
+        }
+        
+        .game-button.next-round {
+            background-color: #00c4a7;  /* Bulma's turquoise */
+            color: white;
+            font-size: 1.1rem;
+            padding: 1.25rem 2rem;
+            margin-top: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
+        }
+        
+        .game-button.next-round:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+            background-color: #00b19a;
+        }
+        
+        .game-button.reset {
+            background-color: #ff3860;  /* Bulma's danger red */
+            color: white;
+            font-size: 0.9rem;
+            padding: 0.75rem 1.5rem;
+            margin-top: 2rem;
+            opacity: 0.85;
+            transition: opacity 0.2s ease;
+        }
+        
+        .game-button.reset:hover {
+            opacity: 1;
+            background-color: #ff1447;
+        }
+        
+        .button.is-primary.is-large {
+            padding: 1.5rem 3rem;
+            font-size: 1.25rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
+        }
+        
+        .button.is-primary.is-large:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
         }
         
         @media screen and (max-width: 768px) {
@@ -37,10 +133,28 @@
                 font-size: 1.25rem;
             }
             
-            .input-section input {
-                width: 100%;
-                margin-bottom: 0.5rem;
+            .input-section .field {
+                max-width: 100%;
             }
+            
+            .synonyms-container {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+            }
+            
+            .button.is-primary.is-large {
+                padding: 1.25rem 2rem;
+                font-size: 1.1rem;
+            }
+            
+            .game-button {
+                min-width: 140px;
+            }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
@@ -52,7 +166,7 @@
                 <div id="game-area">
                     <!-- Rules Section -->
                     <div class="rules-section">
-                        <h2 class="subtitle">How to play:</h2>
+                        <h2 class="subtitle has-text-centered">How to play:</h2>
                         <p class="rules-text">
                             The goal is to guess the target word. Synonyms of the target word will be shown one after another. 
                             Guess the target word before you run out of clues!
@@ -62,7 +176,7 @@
                     <!-- Game Control Section -->
                     <div class="game-control-section">
                         <div id="game-buttons">
-                            <button class="button is-primary game-button" 
+                            <button class="button is-primary is-large game-button" 
                                     hx-post="/api/toggle-game"
                                     hx-target="#game-buttons"
                                     hx-swap="innerHTML">
