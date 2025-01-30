@@ -486,23 +486,27 @@ def start_game():
             <!-- Input Area -->
             <div class="input-section">
                 <h2 class="subtitle">Guess the target word</h2>
-                <form hx-post="/api/process-input" 
-                      hx-target="#input-result"
-                      hx-on::after-request="this.reset(); this.querySelector('input').focus()">
-                    <div class="field has-addons">
-                        <div class="control is-expanded">
-                            <input class="input" 
-                                   type="text" 
-                                   name="text" 
-                                   placeholder="Enter text here..."
-                                   autofocus
-                                   required>
-                        </div>
-                        <div class="control">
-                            <button class="button is-primary" type="submit">Submit</button>
-                        </div>
+                <div class="field has-addons">
+                    <div class="control is-expanded">
+                        <input id="game-input"
+                               class="input" 
+                               type="text" 
+                               name="text" 
+                               placeholder="Enter text here..."
+                               hx-post="/api/process-input"
+                               hx-trigger="keyup[enter] from:#game-input, click from:#submit-button"
+                               hx-target="#input-result"
+                               required>
                     </div>
-                </form>
+                    <div class="control">
+                        <button id="submit-button" 
+                                class="button is-primary"
+                                hx-post="/api/process-input"
+                                hx-target="#input-result">
+                            Submit
+                        </button>
+                    </div>
+                </div>
                 <div id="input-result"></div>
             </div>
 

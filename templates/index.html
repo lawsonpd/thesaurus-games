@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
     <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+    <script>
+        document.body.addEventListener('htmx:afterRequest', function(evt) {
+            const input = document.getElementById('game-input');
+            if (input) {
+                input.value = '';  // Clear the input
+                input.focus();     // Refocus
+            }
+        });
+    </script>
     <style>
         /* Keep existing styles but update for Bulma compatibility */
         .game-container {
