@@ -202,10 +202,13 @@ def process_input():
             render_template_string("""
                 <div id="input-result">
                     <div class="close-guess-message">Close guess!</div>
-                    <div class="guesses">
-                        {% for guess in guesses %}
-                            <span class="guess">{{ guess }}</span>
-                        {% endfor %}
+                    <div class="box mt-3">
+                        <h3 class="subtitle is-6 mb-2">Your guesses:</h3>
+                        <div class="tags are-medium">
+                            {% for guess in guesses %}
+                                <span class="tag">{{ guess }}</span>
+                            {% endfor %}
+                        </div>
                     </div>
                 </div>
             """, guesses=guesses),
@@ -229,8 +232,8 @@ def process_input():
             render_template_string("""
             <!-- Display Area -->
             <div class="display-section">
-                <div class="notification is-success has-text-centered" style="max-width: 500px; margin: 1rem auto;">
-                    <h2 class="title is-4 mb-0">Round {{ current_round - 1 }} completed!</h2>
+                <div class="has-text-centered" style="max-width: 500px; margin: 2rem auto;">
+                    <h2 class="title is-3 has-text-success">Round {{ current_round - 1 }} completed!</h2>
                 </div>
                 <div class="success-message">Congratulations! The word was '{{ target_word }}'</div>
                 <div class="box mt-4">
@@ -257,6 +260,20 @@ def process_input():
                 </div>
             </div>
 
+            <!-- Previous Rounds -->
+            {% if correct_words|length > 1 %}
+                <div class="box mt-4">
+                    <h3 class="subtitle is-6 mb-2">Previous target words:</h3>
+                    <div class="content">
+                        <ul class="word-list">
+                            {% for entry in correct_words[:-1] %}
+                                <li>Round {{ entry.round }}: {{ entry.word }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            {% endif %}
+
             <!-- Game Control Section -->
             <div class="game-control-section">
                 <div id="game-buttons">
@@ -272,7 +289,8 @@ def process_input():
             target_word=target_word,
             guesses=guesses,
             displayed=displayed,
-            current_round=session['current_round']),
+            current_round=session['current_round'],
+            correct_words=session.get('correct_words', [])),
             headers={
                 "HX-Retarget": "#game-area",
                 "HX-Reswap": "innerHTML",
@@ -346,8 +364,17 @@ def toggle_game():
             }
         )
     else:  # Resetting game
-        session.clear()  # This will clear everything including word cache
+        # Clear specific game state variables
+        session['game_active'] = False
+        session['target_word'] = None
+        session['synonyms'] = []
+        session['displayed_synonyms'] = []
+        session['guesses'] = []
+        session['correct_words'] = []
+        session['current_round'] = 1  # Reset round counter
+        session['close_guess'] = None
         session.modified = True
+        
         return Response(
             render_template_string("""
             <!-- Rules Section -->
@@ -362,7 +389,7 @@ def toggle_game():
             <!-- Game Control Section -->
             <div class="game-control-section">
                 <div id="game-buttons">
-                    <button class="game-button" 
+                    <button class="game-button start"
                             hx-post="/api/toggle-game"
                             hx-target="#game-buttons"
                             hx-swap="innerHTML">
@@ -382,6 +409,14 @@ def start_game():
     """Initialize a new game"""
     global word_cache
     
+    # Check if we're starting fresh (no active game)
+    if not session.get('game_active'):
+        # Reset all game state
+        session['correct_words'] = []
+        session['current_round'] = 1
+        session['close_guess'] = None
+        session.modified = True
+    
     # Check cache at the start of each round
     if not ensure_word_cache():
         return Response(
@@ -391,7 +426,7 @@ def start_game():
                         Failed to retrieve enough words. Please try again.
                     </div>
                     <div id="game-buttons">
-                        <button class="game-button" 
+                        <button class="game-button start"
                                 hx-post="/api/toggle-game"
                                 hx-target="#game-buttons"
                                 hx-swap="innerHTML">
@@ -409,30 +444,19 @@ def start_game():
     # Get the next word from the cache
     with cache_lock:
         word_data = word_cache.pop(0)
-    print(f"\nUsing word from cache: {word_data['word']}")
-    print(f"Cache size after pop: {len(word_cache)}")
-
-    target_word = word_data['word']
-    synonyms = word_data['synonyms']
-    part_of_speech = word_data['part_of_speech']
     
     # Set up new game state
-    session['target_word'] = target_word
-    session['synonyms'] = synonyms
-    session['part_of_speech'] = part_of_speech
+    session['target_word'] = word_data['word']
+    session['synonyms'] = word_data['synonyms']
+    session['part_of_speech'] = word_data['part_of_speech']
     session['displayed_synonyms'] = []
     session['game_active'] = True
     session['guesses'] = []
     
-    # Initialize multi-round stats if not exists
-    if 'correct_words' not in session:
-        session['correct_words'] = []
-        session['current_round'] = 1
-    
     session.modified = True
     
     # Return the initial game UI without rules section
-    total_synonyms = len(synonyms)
+    total_synonyms = len(word_data['synonyms'])
     return Response(
         render_template_string("""
         <!-- Game Area -->
@@ -441,7 +465,7 @@ def start_game():
             <div class="display-section">
                 <h2 class="subtitle">The target word part of speech is {{ part_of_speech }}</h2>
                 <div id="display-area"
-                     hx-trigger="load delay:100ms, every 7s"
+                     hx-trigger="load delay:100ms, every 10s"
                      hx-post="/api/next-synonym"
                      hx-swap="innerHTML">
                     <div class="synonyms-container">
@@ -497,7 +521,7 @@ def start_game():
             </div>
         </div>
         """, 
-        part_of_speech=part_of_speech,
+        part_of_speech=word_data['part_of_speech'],
         total_synonyms=total_synonyms,
         displayed=session.get('displayed_synonyms', [])),
         headers={
@@ -527,11 +551,12 @@ def next_synonym():
         
         return Response(
             render_template_string("""
-                <div class="game-over-message">
-                    Game Over! The word was '{{ target_word }}'
+                <div class="has-text-centered" style="max-width: 500px; margin: 2rem auto;">
+                    <h2 class="title is-3 has-text-danger">Game Over!</h2>
+                    <p class="subtitle is-4">The word was '{{ target_word }}'</p>
                 </div>
-                <div class="game-stats">
-                    <h3>Final Score</h3>
+                <div class="box mt-4">
+                    <h3 class="subtitle is-6 mb-2">Final Score</h3>
                     <p>You correctly guessed {{ correct_words|length }} words:</p>
                     <ul class="word-list">
                         {% for entry in correct_words %}
@@ -539,8 +564,8 @@ def next_synonym():
                         {% endfor %}
                     </ul>
                 </div>
-                <div>The synonyms for the final word were:</div>
                 <div class="box mt-4">
+                    <h3 class="subtitle is-6 mb-2">Synonyms for '{{ target_word }}':</h3>
                     <div class="content">
                         <ul class="synonym-list">
                             {% for word in displayed %}
@@ -549,8 +574,8 @@ def next_synonym():
                         </ul>
                     </div>
                 </div>
-                <div id="game-buttons">
-                    <button class="game-button" 
+                <div id="game-buttons" class="has-text-centered">
+                    <button class="game-button start"
                             hx-post="/api/toggle-game"
                             hx-target="#game-buttons"
                             hx-swap="innerHTML">

@@ -78,6 +78,15 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
             min-width: 160px;
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
+        }
+        
+        .game-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
         }
         
         .game-button.next-round {
@@ -86,13 +95,9 @@
             font-size: 1.1rem;
             padding: 1.25rem 2rem;
             margin-top: 2rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            transition: all 0.2s ease;
         }
         
         .game-button.next-round:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
             background-color: #00b19a;
         }
         
@@ -102,26 +107,22 @@
             font-size: 0.9rem;
             padding: 0.75rem 1.5rem;
             margin-top: 2rem;
-            opacity: 0.85;
-            transition: opacity 0.2s ease;
-        }
-        
-        .game-button.reset:hover {
-            opacity: 1;
             background-color: #ff1447;
         }
         
-        .button.is-primary.is-large {
-            padding: 1.5rem 3rem;
-            font-size: 1.25rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            transition: all 0.2s ease;
+        .game-button.reset:hover {
+            background-color: #ff1447;
         }
         
-        .button.is-primary.is-large:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+        .game-button.start {
+            padding: 1.5rem 3rem;
+            font-size: 1.25rem;
+            background-color: #00d1b2;  /* Bulma's primary color */
+            color: white;
+        }
+        
+        .game-button.start:hover {
+            background-color: #00c4a7;
         }
         
         @media screen and (max-width: 768px) {
@@ -176,7 +177,7 @@
                     <!-- Game Control Section -->
                     <div class="game-control-section">
                         <div id="game-buttons">
-                            <button class="button is-primary is-large game-button" 
+                            <button class="game-button start" 
                                     hx-post="/api/toggle-game"
                                     hx-target="#game-buttons"
                                     hx-swap="innerHTML">
