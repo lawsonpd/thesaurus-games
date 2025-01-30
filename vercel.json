@@ -1,16 +1,16 @@
 {
     "version": 2,
-    "functions": {
-        "api/index.py": {
-            "maxDuration": 10,
-            "runtime": "@vercel/python",
-            "memory": 1024,
-            "config": {
+    "builds": [
+        {
+            "src": "api/index.py",
+            "use": "@vercel/python",
+            "config": { 
                 "runtime": "python3.9",
+                "maxLambdaSize": "15mb",
                 "pip": ["flask==3.0.2", "requests==2.31.0", "itsdangerous==2.1.2"]
             }
         }
-    },
+    ],
     "routes": [
         {
             "src": "/(.*)",
