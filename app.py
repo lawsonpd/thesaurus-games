@@ -163,7 +163,7 @@ def process_input():
     if not session.get('game_active'):
         return jsonify({"status": "error", "message": "No active game"})
     
-    input_text = request.form.get('text', '').lower()
+    input_text = request.form.get('text', '').lower().strip()
     target_word = session.get('target_word', '').lower()
     displayed = session.get('displayed_synonyms', [])
     all_synonyms = session.get('synonyms', [])
@@ -488,15 +488,14 @@ def start_game():
                 <h2 class="subtitle">Guess the target word</h2>
                 <form hx-post="/api/process-input" 
                       hx-target="#input-result"
-                      hx-on::after-request="this.reset()">
+                      hx-on::after-request="this.reset(); this.querySelector('input').focus()">
                     <div class="field has-addons">
                         <div class="control is-expanded">
                             <input class="input" 
                                    type="text" 
                                    name="text" 
                                    placeholder="Enter text here..."
-                                   pattern="[A-Za-z]+"
-                                   title="Please enter only alphabetic characters"
+                                   autofocus
                                    required>
                         </div>
                         <div class="control">
