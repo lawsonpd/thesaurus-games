@@ -47,7 +47,7 @@
         
         .synonyms-container {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(2, 1fr);  /* Always 2 columns on desktop */
             gap: 1rem;
             margin: 1rem 0;
         }
@@ -139,8 +139,14 @@
             }
             
             .synonyms-container {
-                grid-template-columns: 1fr;
+                grid-template-columns: 1fr;  /* Force single column */
+                max-width: 300px;  /* Constrain width on mobile */
+                margin: 1rem auto;  /* Center the container */
                 gap: 0.5rem;
+            }
+            
+            .synonym-word {
+                margin: 0;  /* Remove margin on mobile */
             }
             
             .button.is-primary.is-large {
